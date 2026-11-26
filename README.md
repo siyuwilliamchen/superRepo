@@ -14,12 +14,13 @@ pages, claim maps or ledger inventories of a vault) and no private session data
 
 | Role | What it is | Where |
 |---|---|---|
-| **Conversationalist** | The one user-facing role. Talks with William, decides what to raise, files every request, brings results back, freezes the writing brief. | `system/agents/conversationalist.md`, `tools/conversationalist.py` |
+| **Conversationalist** | The one user-facing role. Talks with William, decides what to raise, files every request, brings results back, freezes the writing brief. Its workspace tells a fresh session the current topic, decisions, pending work and next action. | `system/agents/conversationalist.md`, `tools/conversationalist.py` |
 | **Coordinator** | Durable routing and recovery, ordinary code: one ticket per request key, receipts, leases, exactly-once follow-on, delivery to the session inbox, stall guard. The only writer of `workflow/`. | `system/methods/coordinator.md`, `tools/coordinator.py` |
 | **Watchdog** | Independent of both: notices a dead or late Coordinator service, dead relays, interrupted jobs and overdue attempts; escalates through the Coordinator only. | `system/methods/watchdog.md`, `tools/watchdog.py` |
 | Researcher, Interpreter, Writer and reviewers | Workers the Coordinator routes to by capability. | `system/agents/`, `workflow/roster.json` |
 | Ledger and Housekeeper (pilot) | Stable ids and required-input chains for durable material; eligible / held / unresolved; verified retire and restore. Fixture-tested only. | `system/methods/ledger.md`, `tools/ledger.py` |
 | Publication | A frozen brief becomes a package of sources and a deterministic HTML and PDF edition outside git. | `system/methods/publication.md`, `tools/publish.py` |
+| Model check and usage accounting | Which model was asked for, which the host selected, which the provider reported; token counts per agent, child against parent, by role, stage and outcome. Local and untracked. | `system/methods/usage.md`, `tools/modelcheck.py`, `tools/usage.py` |
 
 Start with `system/README.md`, then `system/methods/README.md`. The two designs this
 implements are in `docs/design/`.
@@ -27,14 +28,18 @@ implements are in `docs/design/`.
 ## Running it
 
 ```
-python -m unittest discover -s tools/tests -p "test_*.py" -v     # 70 tests
+python -m unittest discover -s tools/tests -p "test_*.py" -v     # 101 tests
 python tools/coordinator.py status                                # the ticket ledger
+python tools/conversationalist.py workspace                       # where things stand, for a session that starts cold
 python tools/conversationalist.py open --session <S> --topic <topic>
 python tools/watchdog.py serve --once                             # one independent tick
+python tools/modelcheck.py run --host claude --model haiku        # one tiny worker: asked against reported
+python tools/usage.py report                                      # what each agent used
 ```
 
 Every tool takes `LIVEOS_ROOT` to point at another root (the tests use a scratch one). Runtime
-state (`.local/`), sessions, generated editions and audio are ignored by git.
+state (`.local/`, which holds the usage logs and model checks), sessions (with the workspace
+pointer), generated editions and audio are ignored by git.
 
 ## Where it sits against a vault
 

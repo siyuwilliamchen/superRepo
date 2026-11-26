@@ -3,7 +3,8 @@
 Phases 2–3 of "LiveOS research through conversation" (William's design, 2026-11-25, Draft 1,
 filed at `Project_Management/inputs/William_2026-11-25_LiveOS_Research_Conversation_Spec.md`).
 Built 2026-11-25/26 on top of the Coordinator (`system/methods/coordinator.md`).
-Code: `tools/conversationalist.py`. Tests: `tools/tests/test_conversationalist.py` (17 tests).
+Code: `tools/conversationalist.py`. Tests: `tools/tests/test_conversationalist.py` (17 tests) and,
+for the workspace added 2026-11-26, `tools/tests/test_workspace.py` (8 tests).
 Role text: `system/agents/conversationalist.md`; adapters `.claude/agents/conversationalist.md`,
 `.codex/agents/conversationalist.toml`. Roster entry with client declarations: `workflow/roster.json`.
 
@@ -26,7 +27,13 @@ Coordinator's receipt is the only thing the partner may call "recorded".
 | `sessions/<S>/inbox.jsonl` | Written by the Coordinator; the Conversationalist owns the `read` flag | yes |
 | `sessions/<S>/spoken.jsonl`, `relays.jsonl` | What was said aloud (and how), what was pushed to a chat | yes |
 | `sessions/<S>/checkpoints/`, `briefs/` | Round checkpoints; frozen writing briefs | yes |
+| `sessions/<S>/decisions.jsonl` | William's decisions: append-only `D-N`, each with the turn it was made in and the decision it replaces, if any | see note |
+| `sessions/workspace.json` | The workspace pointer: which session and checkpoint a fresh session loads first | see note |
 | `.local/workflow/relays/<S>.json`, `.local/workflow/spoken/` | Relay heartbeat; synthesized audio | no |
+
+Note on the last column: it describes the vault worktree this was built in. In this repository
+(superRepo) `sessions/` is ignored by git, so no session file, decision or workspace pointer is
+tracked here; a test checks it (`test_workspace_and_sessions_are_ignored_by_git`).
 
 ## Acknowledgment levels, told apart
 
@@ -115,6 +122,52 @@ contested and deferred points, open tickets with acknowledgment, and the last de
 `brief` refuses while an outstanding ticket's claims intersect the lead claims, naming the ticket
 and the claims; `--accept-limitation` writes the limitation into the brief and files the `write`
 ticket. No draft exists before the authorising turn.
+
+## The workspace: what a fresh session loads first (2026-11-26)
+
+A session that has just started knows no session id and remembers nothing. `open` needs the id;
+the workspace does not.
+
+```
+python tools/conversationalist.py decide --session <S> --turn u-12 --text "..." [--supersedes D-2]
+python tools/conversationalist.py checkpoint --session <S> --note "..." --next "the next action, one sentence"
+python tools/conversationalist.py workspace [--session <S>] [--json]
+```
+
+It is built on the checkpoints, not beside them. `checkpoint` now also stores the current
+decisions and the next action, and writes `sessions/workspace.json`, a pointer to that session
+and checkpoint with the checkpoint file's hash. `workspace` answers four things:
+
+| Part | Where it comes from |
+|---|---|
+| Current topic | The session's topic, its index path, the governing question and revision |
+| Decisions | `decisions.jsonl`, replaced ones left out; one made after the checkpoint is marked so |
+| Pending work | Read again at load time, not copied from the checkpoint: open tickets with their state in the ledger and their acknowledgment level, results in the inbox not yet brought in, requests saved locally, contested and deferred points |
+| Next action | The sentence recorded at the checkpoint, unless something must come first: unread results (then `catchup`), or locally saved requests (then `flush`). The recorded action is kept as `then`. With nothing recorded, the view says so and names what is still out |
+
+A pointer that is missing, unreadable, names a session that is not on disk, or is older than the
+newest checkpoint is not trusted: the newest checkpoint on disk is used and the view says which
+happened. With no checkpoint anywhere the answer is `workspace: empty`, not an invented state.
+When two conversations exist, the one checkpointed last is the workspace; `--session` names another.
+
+**Verified.** `test_workspace.py` runs every step as a new process against a scratch root, so
+each call is a restart: the reload with no session id; a ticket finished and a result landed
+after the checkpoint; a decision made later; the pointer deleted, corrupted, pointed at a missing
+session and left stale; two sessions; the empty case; a committed ticket with a shared remote that
+cannot be reached. **Live run, 2026-11-26:** a new Claude Code
+session (`claude -p --model haiku --safe-mode`, built-in tools limited to Bash, one allowed
+command, prompts denied) was told only to run `python tools/conversationalist.py workspace`
+against a scratch root holding one invented conversation, and to say where things stood. It ran
+that one command (no permission denial) and restated the topic and question, both decisions, the
+open research ticket and the deferred point, and the recorded next action, each correctly.
+
+**Limits.** A decision exists only if the partner records it with `decide`; nothing extracts
+decisions from the turns. The next action is whatever one sentence was given at the checkpoint.
+The live reload was run on Claude Code with a small model and invented content; a Codex session
+playing the Conversationalist has not been tried. Loading the workspace reads each open ticket's
+acknowledgment level, so in a checkout with a remote and a committed ticket it asks the remote
+once (the live check described above, bounded by `LIVEOS_REMOTE_TIMEOUT`); offline, the level
+reads `committed` and the load still completes.
 
 ## Where this departs from the design
 

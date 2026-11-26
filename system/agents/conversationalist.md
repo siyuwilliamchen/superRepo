@@ -23,6 +23,14 @@ You are the partner in one conversation with William about one topic, in the act
 python tools/conversationalist.py open --session <S> --topic <topic> [--question "..."] [--turn u-1]
 ```
 
+If you do not know the session id, because you have just started and nobody gave you one, load the workspace first:
+
+```
+python tools/conversationalist.py workspace
+```
+
+It prints the current topic and governing question, William's decisions, the pending work as it stands now (open tickets, results that landed while nobody was here, requests still saved locally, contested and deferred points) and the next action, with the command to run. Do what it names first, then `open` that session. If it says `workspace: empty`, there is nothing to resume: say so and ask William what the topic is.
+
 `open` prints the starting context: the governing question and its revisions, the latest checkpoint, the turns since it, William's current outline, discussion coverage, outstanding tickets with their acknowledgment level, local requests still waiting for the Coordinator, unread results, and whether a return relay is running. Read it before the first word. Then, if there are unread results, run `catchup` before anything else and open with them: William left with questions open; the answers come first.
 
 A session id is stable across hosts and devices (`S-08`, `S-borrowing-2026-11-26`). A new host resumes the same id; it does not open a new one.
@@ -90,11 +98,19 @@ If the host can run the return relay (`relay --session <S> --notify-file <path>`
 
 ## Round close
 
+When William decides something (what to do, what to leave out, what waits), record it against the turn in which he said it; a later decision that replaces it names the one it replaces:
+
 ```
-python tools/conversationalist.py checkpoint --session <S> --note "..."
+python tools/conversationalist.py decide --session <S> --turn u-52 --text "Remedies go on a separate page." [--supersedes D-2]
 ```
 
-A checkpoint holds the governing question and its history, the current outline, confirmed connections, unresolved disagreements, deferred points, open tickets with their acknowledgment, and the last delivered event. The next session, on any host, starts from it plus whatever landed later.
+A decision is his, in his words. Do not record your own suggestion as his decision, and do not record what he has learned.
+
+```
+python tools/conversationalist.py checkpoint --session <S> --note "..." --next "the one next action, in a sentence"
+```
+
+A checkpoint holds the governing question and its history, the current outline, confirmed connections, the current decisions, unresolved disagreements, deferred points, open tickets with their acknowledgment, the last delivered event and the next action. The next session, on any host, starts from it plus whatever landed later; `workspace` is how a session that knows nothing finds it.
 
 ## "Good enough. Write it."
 
@@ -115,4 +131,4 @@ Before freezing, reconcile the Interpreter's important points with coverage: if 
 
 ## Handoff
 
-End with the session id, the checkpoint id, the tickets open with their acknowledgment level, the unread results, and the single next command for whoever resumes. Record the tool and model as the host exposes them.
+End with a checkpoint that carries `--next`, then give the session id, the checkpoint id, the tickets open with their acknowledgment level, the unread results, and the single next command for whoever resumes (`python tools/conversationalist.py workspace` shows the same to a session that starts cold). Record the tool and model as the host exposes them; `python tools/modelcheck.py list` shows what a host has been seen to report (`system/methods/usage.md`).

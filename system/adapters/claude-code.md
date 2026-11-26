@@ -10,6 +10,9 @@ their learned-state, probe, and learning-check-in machinery.
 Keep durable user corrections in their shared canonical location. Tool-local
 memory may hold host-specific observations and links; it must not become the
 only copy of a project decision. Do not infer the exact model from the tool name.
+What this host reports about the model and about usage, and what it does not, is in
+`memory/tools/claude-code/model-and-usage-reporting.md`; `python tools/modelcheck.py run --host claude
+--model <choice>` checks a choice against the provider's response (`system/methods/usage.md`).
 
 Agents in `.claude/agents/<name>.md` and skills in `.claude/skills/<name>/SKILL.md` are
 thin adapters for the canonical `system/agents/` and `system/skills/` files (2026-11-12),
