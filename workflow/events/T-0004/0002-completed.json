@@ -1,0 +1,44 @@
+{
+ "ticket": "T-0004",
+ "sequence": 2,
+ "event": "completed",
+ "at": "2026-11-26T05:33:43+00:00",
+ "worker": "developer",
+ "attempt": 1,
+ "attempt_id": "T-0004#a1-722699",
+ "result": {
+  "question_revision": 1,
+  "input_revision": "git:ba94c299fb706372007ac11324ddd56c73236bbb",
+  "output_revision": "git:ba94c299fb706372007ac11324ddd56c73236bbb",
+  "outcome": "ok",
+  "claim_ids_changed": [
+   "C-07",
+   "C-08",
+   "C-09",
+   "C-10",
+   "C-11",
+   "C-12",
+   "C-13",
+   "C-14",
+   "C-15",
+   "C-16",
+   "C-19",
+   "C-20",
+   "C-21",
+   "C-22",
+   "C-23",
+   "C-24"
+  ],
+  "source_refs": [
+   "system/agents/research-agent.md;Project_Management/inputs/William_2026-11-25_LiveOS_Research_Conversation_Spec.md s3 s4 s7;Project_Management/Document Breakdown Procedure.md Parts 3 6 7 7A;Economics/research/LAW-DOC-charter-preferred/findings.md;Economics/research/LAW-DOC-ira/findings.md;Economics/research/LAW-DOC-board-consent-1/findings.md;Economics/research/LAW-DOC-bylaws/findings.md;Economics/research/LAW-DOC-voting-agreement/findings.md;Economics/research/CASE-DE/findings.md;Economics/research/LAW-02-VC/findings.md"
+  ],
+  "uncertainty": "Maps interpret Level 1 cards; a card error passes through. C-19 stays open by design. Conversationalist does not yet read the map's important flags. Nothing committed; worktree only.",
+  "next_action": "Adopt the worktree; apply the four proposed edits to files outside this ticket's ownership; file the three research requests in map-r2 with --after-success interpret.",
+  "summary": "Interpreter built (phase 3). Files: system/agents/interpreter.md (canonical role text in the research-agent shape) with adapters .claude/agents/interpreter.md and .codex/agents/interpreter.toml; topics/borrowing-consent/profile.md (corporate-law profile: formal authority / practical ability / who enforces / remedy / what observed enforcement establishes; absence of cases is not permission); topics/borrowing-consent/claims/FORMAT.md plus map-r1.json (first real map from LAW-DOC-charter-preferred, LAW-DOC-ira, LAW-DOC-board-consent-1, LAW-DOC-bylaws, LAW-DOC-voting-agreement, CASE-DE, LAW-02-VC, code-dgcl pages: 14 claims incl. C-07 board authority, C-12 threshold condition, C-19 remedy; 13 edges with requires/qualifies/changes the consequence of; 2 open rivals; 4 gaps with scope checked) and map-r2.json (the interpret run); tools/claimmap.py (validate, print, diff = compact difference, ids, latest) and tools/tests/test_claimmap.py (22 tests pass); memory/agents/claude-code-interpreter/current.md. Interpret run through the Coordinator: T-0008 submitted, claimed by interpreter (T-0008#a1-905e8f), 2 progress milestones, completed with the compact difference r1->r2 (C-08, C-19, C-23, C-24; RV-01 void|voidable|remedy; U-05, U-06; 3 research requests), delivered to sessions/S-dev-conversationalist/inbox.jsonl. Verified: tests, validator, ticket lifecycle, evidence refs resolve. Unverified: the maps read cards not originals (Economics/sources/ not in worktree); LAW-TEXT path in the topic index does not exist; the three NVCA-cited cases and the 2026 Moelis reversal are unread. Not edited (proposals in the final report): topics/borrowing-consent/index.md rows 'Current claim map' and 'LAW-TEXT'; workflow/roster.json interpreter status and adapters; system/methods/README.md row; tools/conversationalist.py reading the map's important flags.",
+  "artifact": "system/agents/interpreter.md",
+  "return_to": {
+   "session": "S-dev-conversationalist",
+   "topic": "liveos-conversation"
+  }
+ }
+}

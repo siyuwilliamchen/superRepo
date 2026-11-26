@@ -1,0 +1,36 @@
+# superRepo: the agent layer only. Domain content and private session data never enter.
+
+# runtime state: leases, heartbeats, run records, indexes, synthesized audio
+.local/
+
+# private session data: turns, outlines, inboxes, spoken records, briefs
+sessions/
+
+# generated editions and previews (publication builds)
+output/
+
+# ledger inventories of a vault's domain material (records belong to the vault)
+ledger/*/
+!ledger/README.md
+
+# published report packages belong to the vault that owns the content
+reports/*/
+!reports/README.md
+
+# python and editor
+__pycache__/
+*.pyc
+.pytest_cache/
+*.tmp
+*.log
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# credentials
+.env
+.env.*
+*.key
+*.pem
+credentials*

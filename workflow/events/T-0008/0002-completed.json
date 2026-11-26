@@ -1,0 +1,48 @@
+{
+ "ticket": "T-0008",
+ "sequence": 2,
+ "event": "completed",
+ "at": "2026-11-26T05:32:38+00:00",
+ "worker": "interpreter",
+ "attempt": 1,
+ "attempt_id": "T-0008#a1-905e8f",
+ "result": {
+  "question_revision": 1,
+  "input_revision": "git:ba94c299fb706372007ac11324ddd56c73236bbb",
+  "output_revision": "git:ba94c299fb706372007ac11324ddd56c73236bbb",
+  "outcome": "ok",
+  "claim_ids_changed": [
+   "C-08",
+   "C-19",
+   "C-23",
+   "C-24"
+  ],
+  "source_refs": [
+   "Economics/research/LAW-DOC-charter-preferred/findings.md (lines 96-97",
+   " 265-266",
+   " 306",
+   " 316-317)",
+   "Economics/research/LAW-DOC-ira/findings.md (lines 112",
+   " 133-139",
+   " 254",
+   " 269-272)",
+   "Economics/research/LAW-DOC-board-consent-1/findings.md (lines 35-43",
+   " 80",
+   " 231)",
+   "Economics/research/LAW-DOC-bylaws/findings.md (line 94)",
+   "Economics/research/CASE-DE/findings.md (lines 60",
+   " 79",
+   " 200)",
+   "Economics/pages/law/code-dgcl-122-18.en.html",
+   "topics/borrowing-consent/claims/map-r1.json"
+  ],
+  "uncertainty": "Surviving objections: (1) the 'void' branch rests on NVCA note 39's description of Fletcher, Southpaw and Holifield, none read; (2) the 2026 Moelis reversal is known only from law-firm summaries and concerned a contract, not a charter veto; (3) the vault has no borrowing case at all and no lender-side authority; (4) Economics/sources/ is not in this worktree, so no statute or document text was re-read.",
+  "next_action": "Three bounded research requests in map-r2 requests[]: the executed documents' debt gate, threshold and void wording (C-11, C-12, C-19); the three cited cases read (C-19, C-24); the lender's position (C-23). File them with --after-success interpret.",
+  "summary": "borrowing-consent r1 -> r2 (topics/borrowing-consent/claims/map-r2.json). Against the challenge 'invalid, or a remedy afterward?': the premise 'a consent was required' survives; the inference 'therefore the loan is invalid' does not survive as a general statement (it holds only for a charter gate with 'null and void ab initio' words, only until a DGCL 204/205 repair, and only as between the company and its holders); the inference 'somebody has a remedy afterward' survives in every branch (charter with void words, charter without, contract covenant under 122(18)). Changed: C-19 conclusion split by instrument and wording; C-08 inference now points at the lender question; added C-23 [U] the lender's position is not in the vault; added C-24 [W] the 2026 Moelis reversal reads conflicting terms as voidable, competing with the void branch. Rival RV-01 widened from two readings (void | remedy) to three (void | voidable | remedy); its distinguishing observations are the executed charter's 3.3 wording and the three NVCA-cited cases, read. Gaps opened: U-05 lender position, U-06 executed documents' debt gate, threshold and void words (both load-bearing). No new source read; 12 claims unchanged.",
+  "artifact": "topics/borrowing-consent/claims/map-r2.json",
+  "return_to": {
+   "session": "S-dev-conversationalist",
+   "topic": "borrowing-consent"
+  }
+ }
+}

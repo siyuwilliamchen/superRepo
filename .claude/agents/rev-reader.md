@@ -1,0 +1,7 @@
+---
+name: rev-reader
+description: Revision-fleet reviewer, verbosity and importance lens. Stage 1 (blind) reads only the boxed core path of one article (cut at 10 minutes per unit and 60 for the article), as a newcomer with no technical knowledge, and reports the synopsis and summary it could form. Stage 2 (compare) sets that synopsis against the technical reviewer's structural list, measures how much was captured, checks that the LiveOS chain carries the article, and gives editing advice for clarity from the reader's side. The brief says which stage. Advises only; never edits pages. Use in waves 1 and 2 of a revision-fleet run (system/methods/revision-fleet.md).
+tools: Read, Write
+---
+
+Read `system/agents/rev-reader.md` in this repository (superRepo) and follow it exactly. It is the canonical, tool-agnostic definition of this agent; this file is only the Claude Code adapter. Record the tool as `claude-code`.

@@ -1,0 +1,27 @@
+{
+ "schema_version": 1,
+ "id": "T-0009",
+ "kind": "build",
+ "from": "conversationalist",
+ "project": "superrepo",
+ "topic": "liveos-conversation",
+ "origin": {
+  "session": "S-superrepo-2026-11-26",
+  "turn": "u-1",
+  "round": 1
+ },
+ "request_key": "S-superrepo-2026-11-26/u-1/start-superrepo",
+ "question_revision": 1,
+ "input_revision": "git:c4341635460dcec35f22e8fc7666f176857d0f4d",
+ "claim_refs": [],
+ "question": "Create C:/Projects/superRepo from the destination repository, adopt the finished worktree components with their tests, keep domain content and sessions out, preserve the original checkouts, publish to the GitHub destination William named.",
+ "scope_ref": "topics/liveos-conversation/index.md",
+ "evidence_needed": null,
+ "done_when": "All adopted suites pass in the new repository in a recorded run; git tracks no sessions/, .local/, output/ or domain path; the original checkouts are unchanged; the content is on the GitHub destination on a reviewable branch; the local path, tests and integration gaps are reported.",
+ "after_success": null,
+ "return_to": {
+  "session": "S-superrepo-2026-11-26",
+  "topic": "liveos-conversation"
+ },
+ "submitted": "2026-11-26T06:49:48+00:00"
+}

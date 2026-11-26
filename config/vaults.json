@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "about": "Domain repositories this agent layer may work on. They are explicit external inputs: nothing in superRepo assumes one exists, and a missing path is reported, never guessed. Resolution order for a reference such as topics/x/index.md is this repository's root first, then these vaults in order. Override one path for a session with LIVEOS_VAULT_<NAME>; point at another config file with LIVEOS_VAULTS. Role texts write a vault-relative path as <vault>/... .",
+  "vaults": {
+    "siyujournal": {
+      "path": "C:/Projects/SiyuJournal",
+      "role": "William's research vault: field folders, topics, claim maps, pages, library of originals",
+      "required": false,
+      "rules": ["CLAUDE.md", "AGENTS.md", "Project_Management/LifeOS Method.md", "Project_Management/Standing Preferences.md", "Project_Management/Learning Architecture.md", "Project_Management/Vault Conventions.md"],
+      "topics": "topics",
+      "note": "Registered 2026-11-26. Present only on William's machine; a clean checkout of superRepo runs its tests without it."
+    }
+  }
+}

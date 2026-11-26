@@ -1,0 +1,27 @@
+{
+ "schema_version": 1,
+ "id": "T-0001",
+ "kind": "build",
+ "from": "conversationalist",
+ "project": "liveos",
+ "topic": "liveos-conversation",
+ "origin": {
+  "session": "S-dev-conversationalist",
+  "turn": "u-1",
+  "round": 1
+ },
+ "request_key": "S-dev-conversationalist/u-1/implement-conversationalist",
+ "question_revision": 1,
+ "input_revision": "git:ba94c299fb706372007ac11324ddd56c73236bbb",
+ "claim_refs": [],
+ "question": "Implement and verify the Conversationalist and the shared ticket receipt and recovery (LiveOS design 2026-11-25, phases 2-3).",
+ "scope_ref": "topics/liveos-conversation/index.md",
+ "evidence_needed": "test output, the files changed, the handoff",
+ "done_when": "tools/conversationalist.py and its tests exist; a correction survives a restart; the same request filed twice gives one ticket and one delivered result with provenance; local, ledger, committed and remote acknowledgment are told apart; simulated and actual voice delivery are recorded differently; approvals still needed are listed; the coordinator and conversationalist test suites pass in a recorded run.",
+ "after_success": null,
+ "return_to": {
+  "session": "S-dev-conversationalist",
+  "topic": "liveos-conversation"
+ },
+ "submitted": "2026-11-26T05:03:00+00:00"
+}

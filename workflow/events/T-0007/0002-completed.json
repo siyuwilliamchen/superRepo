@@ -1,0 +1,30 @@
+{
+ "ticket": "T-0007",
+ "sequence": 2,
+ "event": "completed",
+ "at": "2026-11-26T05:31:55+00:00",
+ "worker": "developer",
+ "attempt": 1,
+ "attempt_id": "T-0007#a1-a69d3c",
+ "result": {
+  "question_revision": 1,
+  "input_revision": "git:ba94c299fb706372007ac11324ddd56c73236bbb",
+  "output_revision": "git:ba94c299fb706372007ac11324ddd56c73236bbb",
+  "outcome": "ok",
+  "claim_ids_changed": [],
+  "source_refs": [
+   "Project_Management/inputs/William_2026-11-25_LiveOS_Research_Conversation_Spec.md s3 s4 s6 s8",
+   "system/methods/conversationalist.md",
+   "tools/build_platform_pilot.py",
+   "tools/tests/test_coordinator.py"
+  ],
+  "uncertainty": "PDF byte identity across machines not shown (installed fonts); pagination compared only via byte identity; Chinese/English twin not produced",
+  "next_action": null,
+  "summary": "Publication handoff built: tools/publish.py (scaffold refused without authorising turn + the brief's own write ticket; freeze; deterministic build to output/reports/<id>/<edition>/ with HTML always and PDF via Python Playwright + installed Chrome; verify rebuilds and compares bytes, names a missing input precisely; revise writes a proposal and leaves the edition and sources untouched). tests: python -m unittest tools/tests/test_publish.py -v = 4 tests OK (33 s), end to end through conversationalist.py and coordinator.py; existing 20 coordinator+conversationalist tests still OK. Manual run: verify identical on html/css/build.json/pdf; page_render clean at 1100 light, 1100 dark, 390. Not shown: byte-identical PDF across machines (fonts not shipped); no reviewer pass wired in; one locale per package.",
+  "artifact": "system/methods/publication.md",
+  "return_to": {
+   "session": "S-dev-conversationalist",
+   "topic": "liveos-conversation"
+  }
+ }
+}

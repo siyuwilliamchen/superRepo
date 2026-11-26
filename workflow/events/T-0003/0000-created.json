@@ -1,0 +1,13 @@
+{
+ "ticket": "T-0003",
+ "sequence": 0,
+ "event": "created",
+ "at": "2026-11-26T05:04:14+00:00",
+ "by": "conversationalist",
+ "request_key": "S-dev-conversationalist/u-2/relay-probe",
+ "eligible": [
+  "research-agent",
+  "law-boundary-research",
+  "legal-document-breakdown"
+ ]
+}

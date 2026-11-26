@@ -1,0 +1,27 @@
+{
+ "schema_version": 1,
+ "id": "T-0007",
+ "kind": "build",
+ "from": "conversationalist",
+ "project": "liveos",
+ "topic": "liveos-conversation",
+ "origin": {
+  "session": "S-dev-conversationalist",
+  "turn": "u-8",
+  "round": 1
+ },
+ "request_key": "S-dev-conversationalist/u-8/publication-handoff",
+ "question_revision": 1,
+ "input_revision": "git:ba94c299fb706372007ac11324ddd56c73236bbb",
+ "claim_refs": [],
+ "question": "Build the approved-brief publication handoff (spec section 3 Writer, section 6, phase 4): a frozen brief and its write ticket become a reports/<report-id>/ package of publication sources (Markdown with stable section and claim references, small data, figure definitions, build manifest with hashes), a deterministic HTML build (PDF where the existing renderer allows) into an output directory outside git, a rebuild check, and a revision proposal when a later result lands; nothing is drafted before the authorising turn.",
+ "scope_ref": "topics/liveos-conversation/index.md",
+ "evidence_needed": null,
+ "done_when": "tools/publish.py and tests exist; a scratch brief from tools/conversationalist.py produces a package and an edition; a clean rebuild reproduces the HTML byte for byte; a missing input is named precisely; system/methods/publication.md and one section in system/agents/report-writer.md describe the handoff.",
+ "after_success": null,
+ "return_to": {
+  "session": "S-dev-conversationalist",
+  "topic": "liveos-conversation"
+ },
+ "submitted": "2026-11-26T05:10:40+00:00"
+}

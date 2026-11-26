@@ -1,0 +1,29 @@
+{
+ "ticket": "T-0001",
+ "sequence": 2,
+ "event": "completed",
+ "at": "2026-11-26T05:08:42+00:00",
+ "worker": "developer",
+ "attempt": 1,
+ "attempt_id": "T-0001#a1-d4bbc7",
+ "result": {
+  "question_revision": 1,
+  "input_revision": "git:ba94c299fb706372007ac11324ddd56c73236bbb",
+  "output_revision": "git:ba94c299fb706372007ac11324ddd56c73236bbb",
+  "outcome": "ok",
+  "claim_ids_changed": [],
+  "source_refs": [
+   "tools/tests/test_conversationalist.py",
+   "tools/tests/test_coordinator.py",
+   "memory/agents/claude-code-conversationalist/current.md"
+  ],
+  "uncertainty": "Interpreter not built; Codex chat delivery and spoken playback unverified; nothing committed or pushed",
+  "next_action": null,
+  "summary": "Conversationalist durable side built: tools/conversationalist.py, role system/agents/conversationalist.md with thin Claude Code and Codex adapters, roster roles conversationalist and developer, topic liveos-conversation, method system/methods/conversationalist.md. Recorded run 20261125-210628-tests-coordinator-conversationalist: 20 tests (9 coordinator, 11 conversationalist) pass. Correction survives restart; one effective delayed result with provenance; ack levels local/ledger/committed/remote told apart; simulated vs actual (SAPI wav) speech recorded differently; approvals listed in the method doc. Built in worktree, uncommitted.",
+  "artifact": "system/methods/conversationalist.md",
+  "return_to": {
+   "session": "S-dev-conversationalist",
+   "topic": "liveos-conversation"
+  }
+ }
+}

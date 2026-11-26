@@ -1,0 +1,27 @@
+{
+ "schema_version": 1,
+ "id": "T-0003",
+ "kind": "research",
+ "from": "conversationalist",
+ "project": "liveos",
+ "topic": "liveos-conversation",
+ "origin": {
+  "session": "S-dev-conversationalist",
+  "turn": "u-2",
+  "round": 1
+ },
+ "request_key": "S-dev-conversationalist/u-2/relay-probe",
+ "question_revision": 1,
+ "input_revision": "git:ba94c299fb706372007ac11324ddd56c73236bbb",
+ "claim_refs": [],
+ "question": "No-op probe: does a landed completion reach the active Claude chat without anyone polling?",
+ "scope_ref": "topics/liveos-conversation/index.md",
+ "evidence_needed": null,
+ "done_when": "Complete with a one-line summary; the relay and the chat watch do the rest.",
+ "after_success": null,
+ "return_to": {
+  "session": "S-dev-conversationalist",
+  "topic": "liveos-conversation"
+ },
+ "submitted": "2026-11-26T05:04:14+00:00"
+}
