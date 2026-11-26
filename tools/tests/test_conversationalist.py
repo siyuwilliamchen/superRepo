@@ -307,6 +307,152 @@ class Conversation(unittest.TestCase):
         finally:
             shutil.rmtree(bare, ignore_errors=True)
 
+    # ---- a remote receipt is live evidence from the intended branch, or it is pending
+    def git_ok(self, *args, cwd=None):
+        r = subprocess.run(["git", "-C", str(cwd or self.root), *args], capture_output=True, text=True, encoding="utf-8")
+        self.assertEqual(r.returncode, 0, f"git {args}\n{r.stdout}\n{r.stderr}")
+        return r.stdout.strip()
+
+    def pushed_ticket(self):
+        """A ticket committed on top of a base commit and pushed to a disposable bare remote.
+        The receipt is 'remote' and the local remote-tracking ref says so too: from here on
+        that ref is the stale witness every case below must not believe."""
+        self.open_session()
+        self.git_ok("add", "workflow", "topics")
+        self.git_ok("commit", "-q", "-m", "base")
+        base = self.git_ok("rev-parse", "HEAD")
+        u1 = self.say("S-08", "william", "Check the amendment.")
+        tid = self.ask("S-08", u1)["receipt"]
+        self.git_ok("add", "workflow", "sessions")
+        self.git_ok("commit", "-q", "-m", "ledger")
+        sha = self.git_ok("rev-parse", "HEAD")
+        branch = self.git_ok("rev-parse", "--abbrev-ref", "HEAD")
+        bare = Path(tempfile.mkdtemp(prefix="liveos-remote-"))
+        self.addCleanup(shutil.rmtree, bare, ignore_errors=True)
+        self.git_ok("init", "-q", "--bare", str(bare), cwd=bare)
+        self.git_ok("remote", "add", "origin", str(bare))
+        self.git_ok("push", "-q", "origin", branch)
+        ack = self.receipt(tid)
+        self.assertEqual(ack["level"], "remote")
+        self.assertEqual(ack["committed_in"], sha)
+        self.assertEqual(ack["shared_remote"]["state"], "confirmed")
+        self.assertEqual(ack["shared_remote"]["live_tip"], sha)
+        return {"tid": tid, "bare": bare, "branch": branch, "base": base, "sha": sha}
+
+    def receipt(self, tid, **env):
+        return self.cv("receipt", "--session", "S-08", tid, env_extra=env or None)[1][0]["ack"]
+
+    def other_clone(self, t):
+        """Somebody else's checkout of the same remote."""
+        other = Path(tempfile.mkdtemp(prefix="liveos-other-"))
+        self.addCleanup(shutil.rmtree, other, ignore_errors=True)
+        self.git_ok("clone", "-q", "--branch", t["branch"], str(t["bare"]), str(other), cwd=other)
+        self.git_ok("config", "user.email", "other@example.invalid", cwd=other)
+        self.git_ok("config", "user.name", "other", cwd=other)
+        return other
+
+    def assert_pending(self, t, ack, reason):
+        """Not 'remote', and the old evidence (the local remote-tracking ref) still claims it."""
+        self.assertEqual(ack["level"], "committed", ack)
+        self.assertEqual(ack["on_remote"], [])
+        self.assertEqual(ack["shared_remote"]["state"], "pending")
+        self.assertEqual(ack["shared_remote"]["reason"], reason, ack)
+        self.assertEqual(ack["shared_remote"]["branch"], f"origin/{t['branch']}")
+        self.assertEqual(ack["shared_remote"]["stale_tracking_refs"], [f"origin/{t['branch']}"])
+        self.assertIn(f"origin/{t['branch']}", self.git_ok("branch", "-r", "--contains", t["sha"]),
+                      "the local remote-tracking ref still lists the commit; it must not be believed")
+        self.assertIn("pending", ack["note"])
+
+    def test_remote_receipt_is_pending_when_the_live_branch_was_rewound(self):
+        t = self.pushed_ticket()
+        self.git_ok("update-ref", f"refs/heads/{t['branch']}", t["base"], cwd=t["bare"])
+        ack = self.receipt(t["tid"])
+        self.assert_pending(t, ack, "not-contained")
+        self.assertEqual(ack["shared_remote"]["live_tip"], t["base"])
+        # what the partner says and what the session reports follow the live answer
+        st = self.cv("status", "--session", "S-08", "--json")[1]
+        self.assertEqual(st["tickets"][0]["ack"]["level"], "committed")
+        # pushed again: confirmed again
+        self.git_ok("push", "-q", "origin", t["branch"])
+        self.assertEqual(self.receipt(t["tid"])["level"], "remote")
+
+    def test_remote_receipt_is_pending_when_the_live_branch_was_rewritten_by_someone_else(self):
+        t = self.pushed_ticket()
+        other = self.other_clone(t)
+        self.git_ok("reset", "-q", "--hard", t["base"], cwd=other)
+        self.git_ok("commit", "-q", "--allow-empty", "-m", "another history", cwd=other)
+        tip = self.git_ok("rev-parse", "HEAD", cwd=other)
+        self.git_ok("push", "-q", "--force", "origin", t["branch"], cwd=other)
+        tracking_before = self.git_ok("rev-parse", f"refs/remotes/origin/{t['branch']}")
+        ack = self.receipt(t["tid"])                 # the live tip is a commit this checkout never saw
+        self.assert_pending(t, ack, "not-contained")
+        self.assertEqual(ack["shared_remote"]["live_tip"], tip)
+        self.assertEqual(self.git_ok("rev-parse", f"refs/remotes/origin/{t['branch']}"), tracking_before,
+                         "asking the remote writes no ref in this checkout")
+        self.assertFalse((self.root / ".git" / "FETCH_HEAD").exists())
+
+    def test_remote_receipt_holds_when_someone_else_pushed_on_top(self):
+        t = self.pushed_ticket()
+        other = self.other_clone(t)
+        self.git_ok("commit", "-q", "--allow-empty", "-m", "later work", cwd=other)
+        tip = self.git_ok("rev-parse", "HEAD", cwd=other)
+        self.git_ok("push", "-q", "origin", t["branch"], cwd=other)
+        ack = self.receipt(t["tid"])                 # unseen tip, but it contains the ticket commit
+        self.assertEqual(ack["level"], "remote", ack)
+        self.assertEqual(ack["on_remote"], [f"origin/{t['branch']}"])
+        self.assertEqual(ack["shared_remote"]["live_tip"], tip)
+        self.assertEqual(ack["committed_in"], t["sha"])
+        self.assertEqual(self.git_ok("rev-parse", f"refs/remotes/origin/{t['branch']}"), t["sha"],
+                         "asking the remote writes no ref in this checkout")
+
+    def test_remote_receipt_is_pending_when_the_remote_branch_was_deleted(self):
+        t = self.pushed_ticket()
+        self.git_ok("update-ref", "-d", f"refs/heads/{t['branch']}", cwd=t["bare"])
+        ack = self.receipt(t["tid"])
+        self.assert_pending(t, ack, "absent")
+        self.assertIsNone(ack["shared_remote"]["live_tip"])
+        ctx = self.cv("open", "--session", "S-08")[1]           # a restart reports the same
+        self.assertEqual(ctx["tickets"][0]["ack"], "committed")
+
+    def test_remote_receipt_is_pending_when_the_remote_cannot_be_reached(self):
+        t = self.pushed_ticket()
+        away = t["bare"].with_name(t["bare"].name + "-unplugged")
+        self.addCleanup(shutil.rmtree, away, ignore_errors=True)
+        shutil.move(str(t["bare"]), str(away))                  # the remote is there, the line is down
+        ack = self.receipt(t["tid"])
+        self.assert_pending(t, ack, "offline")
+        self.assertIsNone(ack["shared_remote"]["live_tip"])
+        # a new request filed while offline is not called shared either
+        u2 = self.say("S-08", "william", "And the second amendment.")
+        again = self.ask("S-08", u2, slug="second-amendment")
+        self.assertEqual(again["ack"]["level"], "ledger")
+        shutil.move(str(away), str(t["bare"]))                  # back online
+        self.assertEqual(self.receipt(t["tid"])["level"], "remote")
+        # a remote that does not answer in time is offline too
+        slow = self.receipt(t["tid"], LIVEOS_REMOTE_TIMEOUT="0.001")
+        self.assert_pending(t, slow, "offline")
+
+    def test_remote_receipt_counts_only_the_intended_branch(self):
+        t = self.pushed_ticket()
+        self.git_ok("push", "-q", "origin", f"{t['sha']}:refs/heads/side")
+        self.git_ok("update-ref", "-d", f"refs/heads/{t['branch']}", cwd=t["bare"])
+        self.git_ok("update-ref", "-d", f"refs/remotes/origin/{t['branch']}")
+        self.assertIn("origin/side", self.git_ok("branch", "-r", "--contains", t["sha"]))
+        ack = self.receipt(t["tid"])                 # some live remote branch holds it; not the intended one
+        self.assertEqual(ack["level"], "committed", ack)
+        self.assertEqual(ack["shared_remote"]["reason"], "absent")
+        self.assertEqual(ack["shared_remote"]["branch"], f"origin/{t['branch']}")
+        # the upstream of the checked-out branch is the intended branch
+        self.git_ok("fetch", "-q", "origin")
+        self.git_ok("branch", "-q", "--set-upstream-to", "origin/side")
+        ack = self.receipt(t["tid"])
+        self.assertEqual(ack["level"], "remote", ack)
+        self.assertEqual(ack["on_remote"], ["origin/side"])
+        # and it can be named outright
+        self.assertEqual(self.receipt(t["tid"], LIVEOS_SHARED_BRANCH=f"origin/{t['branch']}")["level"], "committed")
+        bad = self.receipt(t["tid"], LIVEOS_SHARED_BRANCH="elsewhere/main")
+        self.assertEqual(bad["shared_remote"]["reason"], "no-intended-branch")
+
     # ---- voice: simulated against actual
     def test_simulated_and_actual_voice_are_recorded_differently(self):
         self.open_session()

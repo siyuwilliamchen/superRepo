@@ -66,13 +66,23 @@ def when_phrase(iso):
     return "on " + iso[:10]
 
 
-def git(*args):
+def git_run(*args, timeout=20):
+    """(return code, stdout, stderr). The code is None when git could not run or ran out of
+    time; a credential prompt is refused instead of waited for."""
     try:
         r = subprocess.run(["git", "-C", str(ROOT), *args], capture_output=True, text=True,
-                           encoding="utf-8", timeout=20)
-        return r.stdout.strip() if r.returncode == 0 else None
-    except Exception:
-        return None
+                           encoding="utf-8", errors="replace", timeout=timeout,
+                           stdin=subprocess.DEVNULL, env=dict(os.environ, GIT_TERMINAL_PROMPT="0"))
+        return r.returncode, r.stdout.strip(), r.stderr.strip()
+    except subprocess.TimeoutExpired:
+        return None, "", f"no answer within {timeout:g} seconds"
+    except Exception as e:
+        return None, "", str(e)
+
+
+def git(*args):
+    code, out, _ = git_run(*args)
+    return out if code == 0 else None
 
 
 # ---------------------------------------------------------------- the session record
@@ -198,11 +208,120 @@ def pending_path(session, key):
 
 
 # ---------------------------------------------------------------- acknowledgment levels
+def remote_timeout():
+    """Seconds one question to the remote may take before the answer is 'pending'."""
+    try:
+        return float(os.environ.get("LIVEOS_REMOTE_TIMEOUT", "15"))
+    except ValueError:
+        return 15.0
+
+
+def intended_branch(remotes):
+    """The one remote branch a receipt may be confirmed against, as ((remote, branch), None),
+    or (None, why not). LIVEOS_SHARED_BRANCH=<remote>/<branch> names it outright; otherwise it
+    is the upstream of the checked-out branch, and failing that the branch of the same name on
+    the push remote. Any other remote branch that happens to hold the commit does not count."""
+    named = os.environ.get("LIVEOS_SHARED_BRANCH")
+    if named:
+        for r in sorted(remotes, key=len, reverse=True):
+            if named.startswith(r + "/") and len(named) > len(r) + 1:
+                return (r, named[len(r) + 1:]), None
+        return None, f"LIVEOS_SHARED_BRANCH={named} does not start with a configured remote"
+    head = git("symbolic-ref", "--quiet", "--short", "HEAD")
+    if not head:
+        return None, "HEAD is detached, so no remote branch is the intended one"
+    up_remote = git("config", "--get", f"branch.{head}.remote")
+    up_ref = git("config", "--get", f"branch.{head}.merge") or ""
+    if up_remote in remotes and up_ref.startswith("refs/heads/"):
+        return (up_remote, up_ref[len("refs/heads/"):]), None
+    remote = (git("config", "--get", f"branch.{head}.pushRemote") or git("config", "--get", "remote.pushDefault")
+              or ("origin" if "origin" in remotes else remotes[0] if len(remotes) == 1 else None))
+    if remote not in remotes:
+        return None, f"branch {head} has no upstream and the remotes ({', '.join(remotes)}) do not single one out"
+    return (remote, head), None
+
+
+_LIVE = {}   # (remote, branch) -> what the remote itself said, asked once per process
+
+
+def live_tip(remote, branch):
+    """Ask the remote, now, where the branch is. Never read from refs/remotes/: a
+    remote-tracking ref is this checkout's memory of the last fetch or push, and it outlives
+    a deleted branch, a rewritten one and a lost connection."""
+    if (remote, branch) not in _LIVE:
+        ref = f"refs/heads/{branch}"
+        code, out, err = git_run("ls-remote", remote, ref, timeout=remote_timeout())
+        if code != 0:
+            _LIVE[(remote, branch)] = {"reachable": False, "tip": None,
+                                       "error": (err.splitlines() or ["git ls-remote failed"])[-1][:200]}
+        else:
+            tips = [l.split()[0] for l in out.splitlines() if l.split()[1:] == [ref]]
+            _LIVE[(remote, branch)] = {"reachable": True, "tip": tips[0] if tips else None, "error": None}
+    return _LIVE[(remote, branch)]
+
+
+def have_commit(sha):
+    return git_run("cat-file", "-e", sha + "^{commit}")[0] == 0
+
+
+def remote_evidence(sha, remotes):
+    """Is the exact ticket commit contained in the intended branch as the remote holds it now?
+    'confirmed' only on that evidence; everything else is 'pending' with the reason: no
+    intended branch, remote not reachable, branch absent, branch not containing the commit,
+    or a live tip whose history could not be read here."""
+    out = {"state": "pending", "reason": None, "branch": None, "live_tip": None, "checked": now(),
+           "stale_tracking_refs": []}
+    target, why_not = intended_branch(remotes)
+    if not target:
+        out.update(reason="no-intended-branch", detail=why_not)
+        return out
+    remote, branch = target
+    name = f"{remote}/{branch}"
+    out["branch"] = name
+    live = live_tip(remote, branch)
+    tip = out["live_tip"] = live["tip"]
+    if not live["reachable"]:
+        out.update(reason="offline", detail=f"{remote} could not be reached ({live['error']})")
+    elif not tip:
+        out.update(reason="absent", detail=f"{name} does not exist on the remote")
+    else:
+        if tip != sha and not have_commit(tip) and not live.get("fetched"):
+            # the branch moved to a commit this checkout has never seen: take its objects only.
+            # No ref is written (not FETCH_HEAD, not refs/remotes/), so the check changes
+            # nothing a later command would read as evidence.
+            live["fetched"] = True
+            git_run("fetch", "--quiet", "--no-tags", "--no-write-fetch-head", "--refmap=",
+                    remote, f"refs/heads/{branch}", timeout=remote_timeout())
+        if tip == sha:
+            contained = 0
+        elif have_commit(tip):
+            contained = git_run("merge-base", "--is-ancestor", sha, tip)[0]
+        else:
+            contained = None
+        if contained == 0:
+            out.update(state="confirmed", reason=None,
+                       detail=f"commit {sha[:12]} is contained in {name} at {tip[:12]}, asked of the remote just now")
+        elif contained == 1:
+            out.update(reason="not-contained",
+                       detail=f"{name} is at {tip[:12]} on the remote, which does not contain commit {sha[:12]}")
+        else:
+            out.update(reason="unverified",
+                       detail=f"{name} is at {tip[:12]} on the remote; its history could not be read here")
+    if out["state"] != "confirmed":
+        tracking = f"refs/remotes/{name}"
+        if git_run("merge-base", "--is-ancestor", sha, tracking)[0] == 0:
+            out["stale_tracking_refs"] = [name]
+            out["detail"] += "; the local remote-tracking ref still lists the commit, which is not evidence"
+    return out
+
+
 def ack_of(session, key, tid):
     """local: saved in this session only. ledger: the Coordinator persisted the request and
-    issued a receipt. committed: that file is in a git commit. remote: the commit is on a
-    remote-tracking branch, which is the design's definition of a successful acknowledgment.
-    Each level is checked, never assumed."""
+    issued a receipt. committed: that file is in a git commit. remote: that exact commit is
+    contained in the intended branch as the remote holds it at the moment of asking, which is
+    the design's definition of a successful acknowledgment. A remote that cannot be reached,
+    a branch that is gone or one that no longer holds the commit leaves the receipt at
+    committed with shared_remote pending. Each level is checked, never assumed."""
     if pending_path(session, key).is_file() or not tid:
         return {"level": "local", "receipt": tid, "shared_dispatch": "pending",
                 "note": "saved in sessions/; the Coordinator has not accepted it yet"}
@@ -213,18 +332,22 @@ def ack_of(session, key, tid):
     inside_git = git("rev-parse", "--is-inside-work-tree") == "true"
     sha = (git("log", "-1", "--format=%H", "--", rel) or None) if inside_git else None
     remotes = (git("remote") or "").split() if inside_git else []
-    on_remote = []
-    if sha and remotes:
-        on_remote = [b.strip() for b in (git("branch", "-r", "--contains", sha) or "").splitlines() if b.strip()]
-    level = "remote" if on_remote else "committed" if sha else "ledger"
-    note = {"ledger": "in the local ledger file, not yet in a git commit",
-            "committed": "committed locally; no remote holds it" if remotes else
-                         "committed locally; this repository has no remote configured",
-            "remote": "committed and present on a shared remote"}[level]
+    shared = remote_evidence(sha, remotes) if sha and remotes else None
+    confirmed = bool(shared) and shared["state"] == "confirmed"
+    level = "remote" if confirmed else "committed" if sha else "ledger"
     if not inside_git:
         note = "ledger file written; this root is not a git repository, so no commit is possible"
+    elif level == "ledger":
+        note = "in the local ledger file, not yet in a git commit"
+    elif not remotes:
+        note = "committed locally; this repository has no remote configured"
+    elif confirmed:
+        note = "committed and on the shared remote: " + shared["detail"]
+    else:
+        note = "committed locally; no remote holds it on live evidence (pending): " + shared["detail"]
     return {"level": level, "receipt": tid, "persisted": rel, "committed_in": sha,
-            "remotes": remotes, "on_remote": on_remote, "note": note}
+            "remotes": remotes, "on_remote": [shared["branch"]] if confirmed else [],
+            "shared_remote": shared, "note": note}
 
 
 def ack_words(ack, slug):
@@ -236,6 +359,8 @@ def ack_words(ack, slug):
     if ack["level"] == "ledger":
         return base + " It is in the local ledger, not yet shared."
     if ack["level"] == "committed":
+        if (ack.get("shared_remote") or {}).get("reason") in ("offline", "unverified"):
+            return base + " It is committed here; I could not confirm it on the shared remote just now."
         return base + " It is committed here, not yet on the shared remote."
     return base
 

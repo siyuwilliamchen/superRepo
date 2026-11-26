@@ -22,7 +22,7 @@ adapter's instructions.
 
 ## Verification checklist (Codex)
 
-1. `python -m unittest discover -s tools/tests -p "test_*.py" -v` from the repository root: 64 tests
+1. `python -m unittest discover -s tools/tests -p "test_*.py" -v` from the repository root: 70 tests
    on 2026-11-26. The ledger baseline test skips when the vault's IPO-timing chain is not present.
 2. `python tools/coordinator.py status`: every ticket in `workflow/outbox/` has a lifecycle in
    `workflow/events/`; a completed ticket is delivered or has a follow-on child.
