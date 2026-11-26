@@ -1,9 +1,11 @@
 # superRepo: the agent layer only. Domain content and private session data never enter.
 
-# runtime state: leases, heartbeats, run records, indexes, synthesized audio
+# runtime state: leases, heartbeats, run records, indexes, synthesized audio,
+# usage logs and model checks (.local/usage/)
 .local/
 
-# private session data: turns, outlines, inboxes, spoken records, briefs
+# private session data: turns, outlines, decisions, inboxes, spoken records, briefs,
+# and the workspace pointer (sessions/workspace.json)
 sessions/
 
 # generated editions and previews (publication builds)

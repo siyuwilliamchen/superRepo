@@ -5,6 +5,9 @@ paths you edit. Use the tools available in the current session; do not assume a
 connector, model, or delegation feature exists because another session used it.
 
 Record the tool as `codex`. Record the exact model only if the host exposes it.
+As observed on 2026-11-26 it exposes the model the client applied, not one the provider reported:
+write it as "client-applied", not as verified (`memory/tools/codex/model-and-usage-reporting.md`,
+`system/methods/usage.md`).
 Load shared/module memory, your own worker handoff, and the matching model
 observations if relevant. Do not load every other worker's private scratch state.
 

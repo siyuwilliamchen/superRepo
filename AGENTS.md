@@ -22,8 +22,11 @@ adapter's instructions.
 
 ## Verification checklist (Codex)
 
-1. `python -m unittest discover -s tools/tests -p "test_*.py" -v` from the repository root: 64 tests
-   on 2026-11-26. The ledger baseline test skips when the vault's IPO-timing chain is not present.
+1. `python -m unittest discover -s tools/tests -p "test_*.py" -v` from the repository root: 94 tests
+   on 2026-11-26 (64 before the model check, usage accounting and workspace were added). The ledger
+   baseline test skips when the vault's IPO-timing chain is not present; the real-map tests skip
+   with no vault; the two live model-check tests skip unless `LIVEOS_LIVE_MODELCHECK=1`, because
+   each starts one tiny worker and spends a few provider tokens.
 2. `python tools/coordinator.py status`: every ticket in `workflow/outbox/` has a lifecycle in
    `workflow/events/`; a completed ticket is delivered or has a follow-on child.
 3. Each handoff in `memory/agents/*/current.md` names files that exist here, and the checks it
@@ -31,6 +34,15 @@ adapter's instructions.
 4. `git status --porcelain`: no `sessions/`, `.local/`, `output/` or domain path is tracked.
 5. For an adopted change from a vault worktree: the diff against that worktree is limited to path
    adaptation, and the tests still pass in both places.
+6. Model and usage (`system/methods/usage.md`): `python tools/modelcheck.py run --host codex --model
+   <a listed choice>` and `--host claude --model haiku`, then `python tools/modelcheck.py list` and
+   `python tools/usage.py report`. Expect Claude `alias_resolved` with no unknowns, Codex `unknown`
+   with the provider-reported model listed as unknown, and every run "reconciled" or "no host total
+   to check against". `git status --porcelain` stays empty afterwards: the logs are under `.local/`.
+7. Workspace: `python tools/conversationalist.py workspace` in a root with a checkpointed session
+   prints current topic, decisions, pending work and next action; in a root with none it prints
+   `workspace: empty`. The fixtures under `tools/tests/fixtures/usage/` are the output of
+   `make_fixtures.py` there (re-running it leaves `git status` clean) and hold no real transcript.
 
 ## Unresolved integration gaps (2026-11-26)
 
@@ -58,3 +70,9 @@ adapter's instructions.
    `workflow/deadlines.json`.
 8. **`tools/vault_trim.py`** here is the vault's committed version; the vault's main checkout has
    newer uncommitted edits (the `detach` command) owned by the ledger-pilot session.
+9. **Model and usage, open ends (2026-11-26).** Codex exposes no provider-reported model, so every
+   Codex model check ends `unknown`. Nothing ingests usage by itself: no hook is registered, and a
+   worker's capture reaches the store only when `usage.py ingest` is run on it. The Coordinator's
+   `claim` and `complete` do not yet carry a run id into the usage store; `usage.py ingest --ticket`
+   joins them by hand. Codex child agents are attributed only by declaration. The Conversationalist
+   workspace was reloaded live on Claude Code only.

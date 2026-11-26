@@ -19,7 +19,10 @@ conversation survive a restart, a provider switch or a dead device.
   receipt       the acknowledgment level of a ticket: local / ledger / committed / remote
   catchup       bring delivered results into the conversation, once, with provenance
   relay         push a chat notification when a result lands (no conversation polling)
-  checkpoint    round close: everything the next session needs to start
+  decide        one decision William made, with the turn it was made in
+  checkpoint    round close: everything the next session needs to start (--next: the next action)
+  workspace     what a fresh session loads first, with no session id: current topic, decisions,
+                pending work and the next action, from the latest checkpoint plus what changed since
   brief         freeze the writing brief and hand it to the Writer through the Coordinator
   status        the three views, tickets and acknowledgments
 
@@ -37,6 +40,7 @@ ROOT, SESSIONS, TOPICS = co.ROOT, co.SESSIONS, co.TOPICS
 COORD = Path(__file__).resolve().parent / "coordinator.py"
 SEGMENT = int(os.environ.get("LIVEOS_TURN_SEGMENT", "200"))   # turns per durable segment
 RELAY_RUNTIME = co.RUNTIME / "relays"
+WORKSPACE = SESSIONS / "workspace.json"                       # private, like everything under sessions/
 DISPOSITIONS = ("explicit", "confirmed", "inferred")
 COVERAGE_STATES = ("unraised", "raised", "understood", "contested", "deferred", "commissioned", "returned")
 VOICES = ("none", "simulated", "sapi-wav", "sapi-speaker")
@@ -192,6 +196,15 @@ class Session:
         d = self.dir / "checkpoints"
         return sorted(d.glob("*.json")) if d.is_dir() else []
 
+    # -- decisions: append-only, a later one may replace an earlier one
+    def decisions(self):
+        return read_jsonl(self.dir / "decisions.jsonl")
+
+    def current_decisions(self):
+        recs = self.decisions()
+        replaced = {r["supersedes"] for r in recs if r.get("supersedes")}
+        return [r for r in recs if r["id"] not in replaced]
+
 
 def pending_path(session, key):
     return session.pending_dir() / (hashlib.sha256(key.encode()).hexdigest()[:16] + ".json")
@@ -299,6 +312,8 @@ def context_of(s):
                                  "entry": e["entry"], "claims": e.get("claims", [])}
                                 for e in s.current_outline()],
             "coverage": s.coverage(),
+            "decisions_current": [{k: d.get(k) for k in ("id", "turn", "text")} for d in s.current_decisions()],
+            "next_action_at_checkpoint": (cp or {}).get("next_action"),
             "tickets": tickets,
             "pending_local_requests": [p["request_key"] for p in s.pending()],
             "unread_results": len(inbox) - s.state["inbox_cursor"],
@@ -710,6 +725,19 @@ def open_tickets(s):
     return out
 
 
+def cmd_decide(a):
+    s = Session(a.session)
+    if not s.has_turn(a.turn):
+        raise SystemExit(f"conversationalist: no turn {a.turn}; a decision names the turn it was made in")
+    recs = s.decisions()
+    if a.supersedes and a.supersedes not in {r["id"] for r in recs}:
+        raise SystemExit(f"conversationalist: no decision {a.supersedes}")
+    rec = {"id": f"D-{len(recs) + 1}", "turn": a.turn, "text": a.text, "supersedes": a.supersedes, "at": now()}
+    co.append_jsonl(s.dir / "decisions.jsonl", rec)
+    print(json.dumps({"decision": rec["id"], "turn": a.turn, "supersedes": a.supersedes}, ensure_ascii=False))
+    return 0
+
+
 def cmd_checkpoint(a):
     s = Session(a.session)
     n = len(s.checkpoints()) + 1
@@ -721,16 +749,179 @@ def cmd_checkpoint(a):
           "turns": s.state["turns"], "last_turn": turns[-1]["id"] if turns else None,
           "outline_current": s.current_outline(),
           "confirmed_connections": [e for e in s.current_outline() if e["disposition"] in ("explicit", "confirmed")],
+          "decisions": s.current_decisions(), "decisions_recorded": len(s.decisions()),
           "unresolved_disagreements": {k: v for k, v in cov.items() if v["state"] == "contested"},
           "deferred_points": {k: v for k, v in cov.items() if v["state"] == "deferred"},
           "open_tickets": open_tickets(s),
           "last_delivered_event": {"inbox_cursor": s.state["inbox_cursor"], "relay_cursor": s.state["relay_cursor"]},
+          "next_action": {"text": a.next, "turn": turns[-1]["id"] if turns else None} if a.next else None,
           "note": a.note}
-    co.write_atomic(s.dir / "checkpoints" / f"{n:04d}.json", cp)
+    path = s.dir / "checkpoints" / f"{n:04d}.json"
+    co.write_atomic(path, cp)
     s.state["last_checkpoint"] = cp["id"]
     s.save()
+    # the workspace pointer: what a fresh session, knowing no session id, loads first
+    co.write_atomic(WORKSPACE, {"schema_version": 1, "written": now(), "session": s.id, "checkpoint": cp["id"],
+                                "checkpoint_path": path.relative_to(ROOT).as_posix(),
+                                "checkpoint_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                                "current_topic": topic_of(s.state.get("topic"), cp["governing_question"]),
+                                "decisions": cp["decisions"], "next_action": cp["next_action"],
+                                "pending_work_at_checkpoint": {
+                                    "open_tickets": [t["receipt"] or t["request_key"] for t in cp["open_tickets"]],
+                                    "deferred": sorted(cp["deferred_points"]),
+                                    "contested": sorted(cp["unresolved_disagreements"])}})
     print(json.dumps({"checkpoint": cp["id"], "turns": cp["turns"], "open_tickets": len(cp["open_tickets"]),
-                      "path": f"sessions/{s.id}/checkpoints/{n:04d}.json"}, ensure_ascii=False))
+                      "decisions": len(cp["decisions"]), "next_action": a.next,
+                      "path": f"sessions/{s.id}/checkpoints/{n:04d}.json",
+                      "workspace": "sessions/workspace.json"}, ensure_ascii=False))
+    return 0
+
+
+# ---------------------------------------------------------------- the workspace
+def topic_of(topic, question):
+    return {"topic": topic, "topic_index": f"topics/{topic}/index.md" if topic else None,
+            "governing_question": ({"revision": question.get("revision"), "text": question.get("text")}
+                                   if question else None)}
+
+
+def latest_checkpoint_anywhere():
+    """The newest checkpoint of any session, by the time written inside it."""
+    best = None
+    if SESSIONS.is_dir():
+        for p in sorted(SESSIONS.glob("*/checkpoints/*.json")):
+            try:
+                cp = json.loads(p.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            if best is None or (cp.get("at") or "") >= (best[1].get("at") or ""):
+                best = (p, cp)                              # on a tie the later file wins
+    return best
+
+
+def workspace_view(session_id=None):
+    """Current topic, decisions, pending work and next action for a session that has just started.
+
+    The checkpoint is the base. Everything that can have moved since is read again now: ticket
+    states from the ledger, results in the inbox, requests still saved locally, decisions and
+    turns recorded after the checkpoint. A missing or stale pointer file is rebuilt from the
+    newest checkpoint on disk and the view says so."""
+    named = bool(session_id)
+    if not named:
+        # the newest checkpoint on disk decides; the pointer file is only believed if it agrees
+        found = latest_checkpoint_anywhere()
+        if not found:
+            return {"workspace": "empty", "note": "no checkpoint in any session; nothing to resume. "
+                                                  "Open a session and close its first round with checkpoint."}
+        session_id = found[1].get("session") or found[0].parents[1].name
+    s = Session(session_id)
+    cps = s.checkpoints()
+    if not cps:
+        return {"workspace": "empty", "session": s.id,
+                "note": f"session {s.id} has no checkpoint yet; open it for its full context: "
+                        f"python tools/conversationalist.py open --session {s.id}"}
+    cp_path = cps[-1]
+    cp = json.loads(cp_path.read_text(encoding="utf-8"))
+    if named:
+        source, pointer_state = "session named on the command line", None
+    else:
+        pointer = None
+        if WORKSPACE.is_file():
+            try:
+                pointer = json.loads(WORKSPACE.read_text(encoding="utf-8"))
+            except Exception:
+                pointer = None
+        if not isinstance(pointer, dict):
+            pointer_state = "sessions/workspace.json is missing or unreadable"
+        elif pointer.get("session") != s.id:
+            pointer_state = (f"pointer names session {pointer.get('session')}, which is not where the newest "
+                             f"checkpoint is; the checkpoint on disk was used")
+        elif (pointer.get("checkpoint") != cp["id"] or
+              pointer.get("checkpoint_sha256") != hashlib.sha256(cp_path.read_bytes()).hexdigest()):
+            pointer_state = "pointer is older than or differs from the latest checkpoint; the checkpoint on disk was used"
+        else:
+            pointer_state = "matches the latest checkpoint"
+        source = ("sessions/workspace.json" if pointer_state == "matches the latest checkpoint"
+                  else "rebuilt from the newest checkpoint on disk")
+    since = s.state["turns"] - cp["turns"]
+    at_cp = {d["id"] for d in cp.get("decisions", [])}
+    decisions = [{"id": d["id"], "turn": d["turn"], "text": d["text"], "at": d.get("at"),
+                  "since_checkpoint": d["id"] not in at_cp} for d in s.current_decisions()]
+    tickets = open_tickets(s)
+    unread = len(s.inbox()) - s.state["inbox_cursor"]
+    local = [p["request_key"] for p in s.pending()]
+    cov = s.coverage()
+    pending = {"open_tickets": [{k: t.get(k) for k in ("receipt", "request_key", "kind", "slug", "state",
+                                                       "ack", "question", "claims")} for t in tickets],
+               "unread_results": unread, "requests_saved_locally": local,
+               "contested": {k: v.get("note") for k, v in cov.items() if v["state"] == "contested"},
+               "deferred": {k: v.get("note") for k, v in cov.items() if v["state"] == "deferred"}}
+    explicit = cp.get("next_action")
+    recorded = ({"text": explicit["text"], "basis": f"recorded at {cp['id']}, turn {explicit.get('turn')}"}
+                if explicit else None)
+    tool = "python tools/conversationalist.py"
+    if unread:
+        nxt = {"text": f"Bring back the {unread} result(s) that landed while the session was closed, "
+                       f"before anything else.", "basis": "derived: unread results in the inbox",
+               "command": f"{tool} catchup --session {s.id}", "then": recorded}
+    elif local:
+        nxt = {"text": f"Hand the {len(local)} locally saved request(s) to the Coordinator.",
+               "basis": "derived: requests saved locally and not yet accepted",
+               "command": f"{tool} flush --session {s.id}", "then": recorded}
+    elif recorded:
+        nxt = dict(recorded, command=f"{tool} open --session {s.id}", then=None)
+    elif tickets:
+        nxt = {"text": f"No next action was recorded. {len(tickets)} ticket(s) are still out; go on with the "
+                       f"conversation and bring each result back when it lands.",
+               "basis": "derived: open tickets, no recorded next action",
+               "command": f"{tool} open --session {s.id}", "then": None}
+    else:
+        nxt = {"text": "No next action was recorded and nothing is pending.",
+               "basis": "derived: nothing recorded", "command": f"{tool} open --session {s.id}", "then": None}
+    return {"workspace": "loaded", "source": source or "session named on the command line",
+            "pointer": pointer_state, "session": s.id, "checkpoint": cp["id"], "checkpoint_at": cp["at"],
+            "checkpoint_note": cp.get("note"), "turns_since_checkpoint": since,
+            "last_turn_at_checkpoint": cp.get("last_turn"),
+            "current_topic": topic_of(s.state.get("topic"), s.state["question"]),
+            "decisions": decisions, "pending_work": pending, "next_action": nxt}
+
+
+def cmd_workspace(a):
+    v = workspace_view(a.session)
+    if a.json:
+        print(json.dumps(v, ensure_ascii=False, indent=1))
+        return 0
+    if v["workspace"] != "loaded":
+        print(f"workspace: {v['workspace']}. {v['note']}")
+        return 0
+    t = v["current_topic"]
+    q = t["governing_question"] or {}
+    print(f"workspace  session {v['session']}, checkpoint {v['checkpoint']} of {v['checkpoint_at']}"
+          f"  ({v['turns_since_checkpoint']} turn(s) since)  [{v['source']}]")
+    if v["checkpoint_note"]:
+        print(f"  note at checkpoint: {v['checkpoint_note']}")
+    print(f"current topic   {t['topic']}" + (f"  ({t['topic_index']})" if t["topic_index"] else ""))
+    print(f"                question rev {q.get('revision')}: {q.get('text')}")
+    print("decisions" + ("" if v["decisions"] else "       none recorded"))
+    for d in v["decisions"]:
+        print(f"  {d['id']} ({d['turn']}) {d['text']}" + ("  [after the checkpoint]" if d["since_checkpoint"] else ""))
+    p = v["pending_work"]
+    nothing = not (p["open_tickets"] or p["unread_results"] or p["requests_saved_locally"]
+                   or p["contested"] or p["deferred"])
+    print("pending work" + ("    none" if nothing else ""))
+    for k in p["open_tickets"]:
+        print(f"  {k['receipt'] or '(local)':8s} {k['kind']:9s} {k['state']:13s} ack={k['ack']:9s} {k['slug']}: {k['question']}")
+    if p["unread_results"]:
+        print(f"  {p['unread_results']} result(s) landed and not yet brought into the conversation")
+    if p["requests_saved_locally"]:
+        print(f"  {len(p['requests_saved_locally'])} request(s) saved locally, not yet accepted by the Coordinator")
+    for name in ("contested", "deferred"):
+        for point, note in p[name].items():
+            print(f"  {name}: {point}" + (f" ({note})" if note else ""))
+    n = v["next_action"]
+    print(f"next action     {n['text']}  [{n['basis']}]")
+    print(f"                {n['command']}")
+    if n.get("then"):
+        print(f"  then          {n['then']['text']}  [{n['then']['basis']}]")
     return 0
 
 
@@ -887,7 +1078,19 @@ def main():
     rl.add_argument("--interval", type=float, default=2.0); rl.add_argument("--once", action="store_true")
     rl.set_defaults(func=cmd_relay)
 
-    cp = S(sub.add_parser("checkpoint")); cp.add_argument("--note"); cp.set_defaults(func=cmd_checkpoint)
+    dc = S(sub.add_parser("decide"))
+    dc.add_argument("--turn", required=True, help="the turn the decision was made in")
+    dc.add_argument("--text", required=True); dc.add_argument("--supersedes", help="the decision this one replaces")
+    dc.set_defaults(func=cmd_decide)
+
+    cp = S(sub.add_parser("checkpoint")); cp.add_argument("--note")
+    cp.add_argument("--next", help="the next action, in one sentence, for whoever resumes")
+    cp.set_defaults(func=cmd_checkpoint)
+
+    ws = sub.add_parser("workspace")
+    ws.add_argument("--session", default=None, help="default: the session of the latest checkpoint")
+    ws.add_argument("--json", action="store_true")
+    ws.set_defaults(func=cmd_workspace)
 
     b = S(sub.add_parser("brief"))
     b.add_argument("--turn", required=True); b.add_argument("--audience", default="William")
