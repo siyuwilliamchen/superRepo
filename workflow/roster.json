@@ -1,0 +1,135 @@
+{
+  "schema_version": 1,
+  "about": "Machine-readable role roster. The Coordinator routes by capability and scope, never by name, so a provider can be replaced without changing topic files or the ticket format. Canonical role text lives in system/agents/<name>.md; adapters only point at it.",
+  "roles": {
+    "research-agent": {
+      "definition": "system/agents/research-agent.md",
+      "capabilities": ["research"],
+      "adapters": {"claude-code": ".claude/agents/research-agent.md", "codex": ".codex/agents/research-agent.toml"},
+      "reads": ["topics/**", "*/research/**", "*/sources/**", "*/inputs/**", "*/notes/**"],
+      "writes": ["*/research/<ID>/**", "workflow/events/**"],
+      "input": "research ticket",
+      "output": "findings file + source manifest",
+      "fallback": ["law-boundary-research", "legal-document-breakdown"]
+    },
+    "law-boundary-research": {
+      "definition": "system/agents/law-boundary-research.md",
+      "capabilities": ["research"],
+      "adapters": {"claude-code": ".claude/agents/law-boundary-research.md", "codex": ".codex/agents/law-boundary-research.toml"},
+      "reads": ["topics/**", "*/research/**", "*/sources/**"],
+      "writes": ["*/research/<ID>/**", "workflow/events/**"],
+      "input": "research ticket naming one rule or regime",
+      "output": "boundary card with enforcement and workarounds",
+      "specialism": "one rule's practical boundary",
+      "fallback": ["research-agent"]
+    },
+    "legal-document-breakdown": {
+      "definition": "system/agents/legal-document-breakdown.md",
+      "capabilities": ["research"],
+      "adapters": {"claude-code": ".claude/agents/legal-document-breakdown.md", "codex": ".codex/agents/legal-document-breakdown.toml"},
+      "reads": ["topics/**", "*/research/**", "*/sources/**", "*/inputs/**"],
+      "writes": ["*/research/<ID>/**", "workflow/events/**"],
+      "input": "research ticket naming one document",
+      "output": "six-layer breakdown card",
+      "specialism": "one whole legal document",
+      "fallback": ["research-agent"]
+    },
+    "interpreter": {
+      "definition": "system/agents/interpreter.md",
+      "capabilities": ["interpret"],
+      "adapters": {"claude-code": ".claude/agents/interpreter.md", "codex": ".codex/agents/interpreter.toml"},
+      "tool": "tools/claimmap.py",
+      "status": "written 2026-11-26 (phase 3); first map topics/borrowing-consent/claims/map-r2.json",
+      "reads": ["topics/**", "*/research/**", "*/pages/law/**"],
+      "writes": ["topics/<id>/claims/**", "topics/<id>/profile.md", "workflow/events/**"],
+      "input": "interpret ticket, with the evidence already gathered",
+      "output": "claim map: conclusions, relationships, rival readings, boundaries",
+      "fallback": []
+    },
+    "report-writer": {
+      "definition": "system/agents/report-writer.md",
+      "capabilities": ["write"],
+      "adapters": {"claude-code": ".claude/agents/report-writer.md", "codex": ".codex/agents/report-writer.toml"},
+      "tool": "tools/publish.py",
+      "reads": ["topics/**", "*/research/**", "*/pages/**", "reports/**"],
+      "writes": ["*/pages/**", "*/graphs/**", "reports/**", "workflow/events/**"],
+      "input": "frozen writing brief",
+      "output": "publication sources that build to HTML and PDF",
+      "fallback": []
+    },
+    "vault-cleanup": {
+      "definition": "system/agents/vault-cleanup.md",
+      "capabilities": ["diagnose"],
+      "adapters": {"claude-code": ".claude/agents/vault-cleanup.md", "codex": ".codex/agents/vault-cleanup.toml"},
+      "reads": ["**"],
+      "writes": ["catalog/audits/**", "workflow/events/**"],
+      "input": "diagnose ticket",
+      "output": "cleanup proposal; applies only approved groups",
+      "fallback": []
+    },
+    "conversationalist": {
+      "definition": "system/agents/conversationalist.md",
+      "capabilities": [],
+      "requests": ["research", "interpret", "write"],
+      "adapters": {"claude-code": ".claude/agents/conversationalist.md", "codex": ".codex/agents/conversationalist.toml"},
+      "tool": "tools/conversationalist.py",
+      "reads": ["topics/**", "sessions/<session>/**", "*/research/**"],
+      "writes": ["sessions/<session>/**"],
+      "input": "William's turns; the Interpreter's map; delivered results",
+      "output": "durable turns, working outline, coverage, tickets with acknowledgment level, checkpoints, frozen writing brief",
+      "note": "a requester, not a worker: it holds no capability the Coordinator routes to, and never writes the ledger",
+      "clients": {
+        "text-cli": {"submit_tickets": true, "read_durable_state": true, "background_event_mid_session": false,
+                     "insert_at_turn_boundary": "yes, via catchup", "resume_across_devices": true,
+                     "verified": "2026-11-26 by tools/tests/test_conversationalist.py"},
+        "claude-code-chat": {"submit_tickets": true, "read_durable_state": true,
+                             "background_event_mid_session": "yes, when a Monitor watches the relay's notify file",
+                             "insert_at_turn_boundary": true, "resume_across_devices": "same machine only",
+                             "verified": "see system/methods/conversationalist.md, return relay"},
+        "codex-chat": {"submit_tickets": true, "read_durable_state": true,
+                       "background_event_mid_session": "reported delivered once by a Claude completion relay (William, 2026-11-26); not reproduced by this worker",
+                       "insert_at_turn_boundary": "next turn", "resume_across_devices": "same machine only",
+                       "verified": "unverified"},
+        "sapi-voice": {"output_only": true, "modes": ["sapi-wav: synthesis to a file", "sapi-speaker: default audio device"],
+                       "voices": ["Microsoft David Desktop (en-US)", "Microsoft Zira Desktop (en-US)", "Microsoft Huihui Desktop (zh-CN)"],
+                       "verified": "synthesis to file verified 2026-11-26; playback to a listener unverified"},
+        "grokbot": {"verified": "not built, not tested"}
+      },
+      "fallback": []
+    },
+    "watchdog": {
+      "definition": "system/methods/watchdog.md",
+      "capabilities": [],
+      "requests": ["diagnose"],
+      "tool": "tools/watchdog.py",
+      "reads": ["workflow/**", ".local/workflow/**", ".local/runs/**"],
+      "writes": [".local/workflow/watchdog.json", ".local/workflow/watchdog.log"],
+      "input": "the heartbeats and leases on disk",
+      "output": "reconcile runs, at most one diagnose ticket per overdue attempt, a findings log",
+      "note": "a requester, not a worker; the only writer of the ledger stays the Coordinator",
+      "fallback": []
+    },
+    "developer": {
+      "definition": "system/coordination.md",
+      "capabilities": ["build"],
+      "adapters": {"claude-code": "any Claude Code session", "codex": "any Codex session"},
+      "reads": ["**"],
+      "writes": ["tools/**", "system/**", "workflow/roster.json", ".claude/agents/**", ".codex/agents/**", "memory/agents/<worker>/**"],
+      "input": "build ticket: a development assignment from William",
+      "output": "code, tests, canonical definitions and a handoff; the completion names the test run",
+      "note": "added 2026-11-26 so that development assignments are recorded in the same ledger as research",
+      "fallback": []
+    },
+    "structure-evaluator": {
+      "definition": "system/agents/evaluator.md",
+      "capabilities": ["diagnose"],
+      "adapters": {"claude-code": ".claude/agents/structure-evaluator.md", "codex": ".codex/agents/structure-evaluator.toml"},
+      "reads": ["**"],
+      "writes": ["catalog/evaluations/**", "workflow/events/**"],
+      "input": "diagnose ticket naming a handoff to verify",
+      "output": "pass/fail/unverified verdict, or a repair ticket",
+      "note": "an author may never approve its own output as independently reviewed",
+      "fallback": []
+    }
+  }
+}

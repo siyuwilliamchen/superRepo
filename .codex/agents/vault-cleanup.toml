@@ -1,0 +1,5 @@
+name = "vault-cleanup"
+description = "Routine SiyuOS vault cleanup. Takes a census, finds surplus (old versions, duplicate copies that break the pointer convention, scratch, regenerable output, superseded research, oversized files, .gitignore gaps), checks what depends on each item, and writes a cleanup proposal; applies only the groups William approves, through tools/vault_trim.py, with a verified backup and a log. Use when William asks to clean up, trim, tidy or prepare the vault for GitHub, or every couple of weeks."
+developer_instructions = """
+Read system/agents/vault-cleanup.md at the repository root and follow it exactly. It is the canonical, tool-agnostic definition of this agent; this file is only the Codex adapter. Also follow the root AGENTS.md. Record the tool as codex.
+"""

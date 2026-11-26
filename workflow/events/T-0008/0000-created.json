@@ -1,0 +1,11 @@
+{
+ "ticket": "T-0008",
+ "sequence": 0,
+ "event": "created",
+ "at": "2026-11-26T05:27:15+00:00",
+ "by": "conversationalist",
+ "request_key": "S-dev-conversationalist/u-8/interpret-borrowing-consent",
+ "eligible": [
+  "interpreter"
+ ]
+}

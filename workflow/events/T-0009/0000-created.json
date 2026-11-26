@@ -1,0 +1,11 @@
+{
+ "ticket": "T-0009",
+ "sequence": 0,
+ "event": "created",
+ "at": "2026-11-26T06:49:48+00:00",
+ "by": "conversationalist",
+ "request_key": "S-superrepo-2026-11-26/u-1/start-superrepo",
+ "eligible": [
+  "developer"
+ ]
+}

@@ -1,0 +1,152 @@
+# The Conversationalist's durable side
+
+Phases 2–3 of "LiveOS research through conversation" (William's design, 2026-11-25, Draft 1,
+filed at `Project_Management/inputs/William_2026-11-25_LiveOS_Research_Conversation_Spec.md`).
+Built 2026-11-25/26 on top of the Coordinator (`system/methods/coordinator.md`).
+Code: `tools/conversationalist.py`. Tests: `tools/tests/test_conversationalist.py` (17 tests).
+Role text: `system/agents/conversationalist.md`; adapters `.claude/agents/conversationalist.md`,
+`.codex/agents/conversationalist.toml`. Roster entry with client declarations: `workflow/roster.json`.
+
+## The rule
+
+The model that plays the partner talks; this tool keeps every durable part of the conversation on
+disk so that a restart, a provider switch or a dead device loses nothing. It never writes the
+workflow ledger: every ticket goes to `tools/coordinator.py` as a separate process, and the
+Coordinator's receipt is the only thing the partner may call "recorded".
+
+## Where things live
+
+| Path | What it is | In git? |
+|---|---|---|
+| `sessions/<S>/session.json` | Governing question and its revisions, counters, the two cursors (incorporated, relayed), the declared notify adapter | yes |
+| `sessions/<S>/turns/<segment>.jsonl` | Every turn, stable id `u-N`, speaker, kind (`turn`, `correction`, `reentry`), the turn it corrects; segment size fixed at creation | yes |
+| `sessions/<S>/outline.jsonl` | William's working outline: append-only entries `O-N` with originating turn and disposition (explicit / confirmed / inferred), plus correction notes; the current view is derived | yes |
+| `sessions/<S>/coverage.json` | One line per point: unraised, raised, understood, contested, deferred, commissioned, returned | yes |
+| `sessions/<S>/tickets.jsonl`, `pending/` | Requests this session filed, with their acknowledgment; a pending file is the local acknowledgment | yes |
+| `sessions/<S>/inbox.jsonl` | Written by the Coordinator; the Conversationalist owns the `read` flag | yes |
+| `sessions/<S>/spoken.jsonl`, `relays.jsonl` | What was said aloud (and how), what was pushed to a chat | yes |
+| `sessions/<S>/checkpoints/`, `briefs/` | Round checkpoints; frozen writing briefs | yes |
+| `.local/workflow/relays/<S>.json`, `.local/workflow/spoken/` | Relay heartbeat; synthesized audio | no |
+
+## Acknowledgment levels, told apart
+
+The design says a successful acknowledgment is a committed request at the shared remote. This
+checkout has no remote and commits nothing without William's word, so the partner must say less.
+`ask` and `receipt` report what is actually true, in this order:
+
+| Level | What has happened | What the partner says |
+|---|---|---|
+| `local` | The request is saved in `sessions/<S>/pending/`; the Coordinator has not accepted it | "saved here; the shared ledger has not taken it yet; I will keep retrying with the same key" |
+| `ledger` | The Coordinator persisted `workflow/outbox/<kind>/<id>.json` and issued a receipt | "recorded as T-0142 … in the local ledger, not yet shared" |
+| `committed` | That file is in a git commit (checked with `git log -- <path>`) | "committed here, not yet on the shared remote" |
+| `remote` | That exact commit is contained in the intended remote branch as the remote holds it now (`git ls-remote`, then `git merge-base --is-ancestor`) | "recorded as T-0142" |
+
+**`remote` is live evidence or it is pending (2026-11-26).** A remote-tracking ref
+(`refs/remotes/...`) is this checkout's memory of its last fetch or push; it outlives a deleted
+branch, a rewritten one and a lost connection, so it is never read as evidence. The intended
+branch is `LIVEOS_SHARED_BRANCH=<remote>/<branch>` when set, otherwise the upstream of the
+checked-out branch, otherwise the same-named branch on the push remote; another remote branch
+that happens to hold the commit does not count. The remote is asked once per process, with a time
+limit (`LIVEOS_REMOTE_TIMEOUT`, 15 seconds). When the live tip is a commit this checkout has never
+seen, its objects are fetched and no ref is written. Anything short of containment leaves the
+level at `committed` with `shared_remote.state: pending` and one of these reasons:
+
+| `shared_remote.reason` | What the remote said |
+|---|---|
+| `offline` | It could not be reached, or did not answer in time |
+| `absent` | The intended branch is not there (deleted, or never pushed) |
+| `not-contained` | The branch is there at a tip that does not contain the ticket's commit (rewound, rewritten, or not pushed yet) |
+| `unverified` | The branch is at a tip whose history could not be read here |
+| `no-intended-branch` | Detached HEAD, or several remotes and nothing singles one out |
+
+A lost connection (`--offline` in tests) leaves the request at `local`; `flush` retries with the
+original request key, and the Coordinator's idempotency means one ticket however often it is
+retried. In this checkout every real ticket stops at `ledger` (see Approvals).
+
+## Delayed results: once, with provenance, at a pause
+
+`catchup` reads the session inbox past the shared cursor, orders what it finds (results touching
+the current outline's claims first, superseded ones last), appends one `reentry` partner turn per
+result whose `refs` carry the provenance (ticket, the ticket it answers, the question as asked,
+when, the originating turn, question revision, input and output git revisions, claims changed,
+sources), prints the one or two sentences to say, moves the cursor, and marks the inbox lines
+read so the Coordinator's `health` agrees. A second run, or a run after a restart, delivers
+nothing twice. A result for a superseded question revision is reported as "an earlier version of
+the question" and does not move coverage; the ticket stays attributable to its revision.
+
+## Speech: simulated against actual
+
+| Mode | What the record says | Verified |
+|---|---|---|
+| `simulated` | `delivery: simulated`, text only, nothing synthesized | yes |
+| `sapi-wav` | `delivery: actual`, Windows System.Speech synthesized the words into a `.wav` (bytes recorded); nobody has heard it | yes: 558 KB file for the probe re-entry, 2026-11-26; the test asserts synthesis |
+| `sapi-speaker` | `delivery: actual`, played through the default audio device | not run; a listener is never verified by the tool |
+
+Installed voices: Microsoft David and Zira (en-US), Huihui (zh-CN); Chinese text selects the
+zh-CN voice. No voice client (Grokbot or other) exists; text is the equivalent interface.
+
+## The return relay (William's follow-up, request key `liveos-conversationalist-return-relay`)
+
+`relay --session <S> --notify-file <path>` (or `--notify-cmd <argv>`) is a small process that
+watches the session inbox and, for each landed result past the relay cursor, writes one chat
+notification (JSON line) or runs the declared command with it on stdin. It polls the file every
+two seconds; no conversation turn and no model call is spent. The conversation still incorporates
+the result only through `catchup`, so an offline session finds it unread next time.
+
+**Live run, 2026-11-26 05:04 UTC, this Claude Code chat.** The relay ran under
+`tools/run.py` (`20261125-210351-relay-S-dev`); a Claude Code `Monitor` tailed the notify file.
+A worker completed the no-op probe ticket T-0003 at 05:04:44; the relay wrote one notification
+at 05:04:45; the chat received it as a monitor event with no polling by the conversation. The
+inbox item stayed unread until `catchup` at 05:05 took it up (re-entry turn `u-3`). A restarted
+relay (`--once`) notified nothing more. The unit test repeats the same sequence against a
+file standing in for the chat and checks exactly one notification, no speech, unread until
+catch-up.
+
+What is and is not shown: chat delivery into a **Claude Code** session is verified by this run
+(it needs a Monitor armed in that session, which only that session can do). Delivery into a
+**Codex** chat was reported by William as achieved once by a Claude completion relay; this
+worker did not reproduce it and the roster says so. Spoken playback remains unverified.
+
+## Checkpoint and brief
+
+`checkpoint` writes the governing question and history, current outline, confirmed connections,
+contested and deferred points, open tickets with acknowledgment, and the last delivered event;
+`open` builds the next session's context from the latest checkpoint plus everything newer.
+`brief` refuses while an outstanding ticket's claims intersect the lead claims, naming the ticket
+and the claims; `--accept-limitation` writes the limitation into the brief and files the `write`
+ticket. No draft exists before the authorising turn.
+
+## Where this departs from the design
+
+- **Acknowledgment stops at `ledger`.** Nothing is committed or pushed automatically (CLAUDE.md:
+  nothing is committed unless William asks; no remote is configured). The levels above make the
+  gap visible instead of hiding it.
+- **The relay polls a file; the Coordinator does not call out.** The design's "lightweight
+  notification to the active adapter" is implemented beside the Coordinator, not inside it, so the
+  Coordinator stays untouched by this work apart from one additive ticket kind.
+- **`build` is a fifth ticket kind** so a development assignment from William is recorded in the
+  same ledger as research; the `developer` role advertises it. The design names four kinds and
+  says others exist.
+- **Interpreter's map is read-only.** `open` reads the latest map through `tools/claimmap.py`
+  (built the same day under T-0004) and lists the important claims not yet in coverage, each
+  with what William would misunderstand if he missed it: the seed of the "unraised" view. For
+  `borrowing-consent` that is `claims/map-r2.json`, 16 claims, 10 important ones unraised at the
+  start of a fresh session. A topic without a map says so.
+- **Segment size is fixed per session**, not global, so a later host cannot re-split old turns.
+
+## Approvals still needed from William
+
+1. **Commit and remote.** The ledger (`workflow/`, `sessions/`) is uncommitted and there is no git
+   remote; `committed` and `remote` acknowledgment cannot happen until he decides both.
+2. **Adopting this work.** It was built in the worktree `.claude/worktrees/conversationalist`
+   (branch `worktree-conversationalist`), nothing committed. The main checkout's untracked
+   Coordinator files differ from the worktree copies by the one `build` line in
+   `tools/coordinator.py`, the two roster roles, and the coordinator method's "built on top" note.
+3. **The relay as a standing process.** A relay per active session, and the Coordinator's minute
+   check, need a scheduled task or a service on this machine to outlive the session that started them.
+4. **Speaker output.** `--voice sapi-speaker` plays sound on this machine; it has not been run.
+5. **Hooks.** A `PostToolUse` or `SessionStart` hook that arms a Monitor automatically needs the
+   `hooks` block in `.claude/settings.json`, which only William adds.
+6. **The main-checkout ticket T-0001** (`liveos-conversationalist-return-relay`) is still
+   `queued` there; this worker did not write into the main checkout. Its work is done under the
+   worktree's T-0002 and described above.

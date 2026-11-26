@@ -1,0 +1,27 @@
+{
+ "schema_version": 1,
+ "id": "T-0004",
+ "kind": "build",
+ "from": "conversationalist",
+ "project": "liveos",
+ "topic": "liveos-conversation",
+ "origin": {
+  "session": "S-dev-conversationalist",
+  "turn": "u-8",
+  "round": 1
+ },
+ "request_key": "S-dev-conversationalist/u-8/interpreter",
+ "question_revision": 1,
+ "input_revision": "git:ba94c299fb706372007ac11324ddd56c73236bbb",
+ "claim_refs": [],
+ "question": "Build the domain Interpreter (spec section 3 and phase 3): role definition, corporate-law profile for borrowing-consent, claim-map format with stable ids and edge table, a tool to validate and diff maps, and one real interpret run through the Coordinator.",
+ "scope_ref": "topics/liveos-conversation/index.md",
+ "evidence_needed": null,
+ "done_when": "system/agents/interpreter.md and adapters exist; topics/borrowing-consent/profile.md and claims/ hold a first map built from vault evidence with ids, evidence refs, inference, scope, breaking condition, edges and what William would misunderstand; an interpret ticket was claimed and completed with the compact difference; tests pass.",
+ "after_success": null,
+ "return_to": {
+  "session": "S-dev-conversationalist",
+  "topic": "liveos-conversation"
+ },
+ "submitted": "2026-11-26T05:10:05+00:00"
+}

@@ -1,0 +1,27 @@
+{
+ "schema_version": 1,
+ "id": "T-0006",
+ "kind": "build",
+ "from": "conversationalist",
+ "project": "liveos",
+ "topic": "liveos-conversation",
+ "origin": {
+  "session": "S-dev-conversationalist",
+  "turn": "u-8",
+  "round": 1
+ },
+ "request_key": "S-dev-conversationalist/u-8/ledger-pilot",
+ "question_revision": 1,
+ "input_revision": "git:ba94c299fb706372007ac11324ddd56c73236bbb",
+ "claim_refs": [],
+ "question": "Run the scratch Housekeeper ledger pilot (ledger handoff sections 2-7; proposal decisions 2 and 3 taken): tools/ledger.py with register, create, modify, move, retire, restore, reverse dependency lookup, disposable sqlite index, drift detection and a Housekeeper query; a two-domain scratch fixture; a read-only baseline on the real IPO-timing chain; the seven exercises of section 7 as tests.",
+ "scope_ref": "topics/liveos-conversation/index.md",
+ "evidence_needed": null,
+ "done_when": "tools/ledger.py, tools/tests/test_ledger.py (seven exercises, measures recorded), system/methods/ledger.md, one example operation and receipt, one Housekeeper result with a cross-domain hold, remaining coverage gaps listed. No vault file deleted or modified; no edit to tools/vault_trim.py or Project_Management/agent-system/.",
+ "after_success": null,
+ "return_to": {
+  "session": "S-dev-conversationalist",
+  "topic": "liveos-conversation"
+ },
+ "submitted": "2026-11-26T05:10:28+00:00"
+}

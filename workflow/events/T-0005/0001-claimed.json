@@ -1,0 +1,11 @@
+{
+ "ticket": "T-0005",
+ "sequence": 1,
+ "event": "claimed",
+ "at": "2026-11-26T05:10:48+00:00",
+ "worker": "developer",
+ "attempt": 1,
+ "attempt_id": "T-0005#a1-cde6a9",
+ "lease_seconds": 1800,
+ "run_id": null
+}

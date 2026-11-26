@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "about": "Capability-specific deadlines for the independent watchdog (tools/watchdog.py). A deadline is the longest an attempt may stay claimed before the watchdog asks for a diagnosis, measured from the moment the attempt was claimed. It is separate from liveness: the Coordinator's lease (30 min without progress) and stall flag (15 min without progress) catch a worker that goes quiet; these deadlines catch a worker that keeps reporting progress but never finishes. The numbers are first guesses from a handful of runs in November 2026; William sets them. Written in seconds so the code needs no unit conversion.",
+  "escalation": {
+    "once_per_attempt": true,
+    "route": "submit one diagnose ticket through tools/coordinator.py with request key watchdog:deadline:<ticket>#a<attempt>; the Coordinator's idempotency makes a second submission return the same ticket",
+    "never": "the watchdog does not kill the worker, fail the ticket or write any file under workflow/ itself"
+  },
+  "kinds": {
+    "research": {
+      "deadline_seconds": 5400,
+      "reason": "90 minutes. A bounded research question starts at one topic index and reads a handful of sources. Past this the worker is usually repeating the same search or has widened the question without saying so."
+    },
+    "interpret": {
+      "deadline_seconds": 2700,
+      "reason": "45 minutes. Interpretation works from evidence already gathered; it reads no new sources. Longer means it has turned into research, which should be its own ticket."
+    },
+    "write": {
+      "deadline_seconds": 7200,
+      "reason": "2 hours. Writing a page set from a frozen brief, including the build and the link, budget and render checks. Longer usually means the brief was not frozen or the checks keep failing."
+    },
+    "diagnose": {
+      "deadline_seconds": 1800,
+      "reason": "30 minutes. A diagnosis reads the lifecycle records and names a cause or the one decision needed. Longer means the diagnosis has become an investigation, which should be a research ticket."
+    },
+    "build": {
+      "deadline_seconds": 21600,
+      "reason": "6 hours. A development assignment: code, tests, method note and handoff. The builds of 2026-11-25/26 took two to four hours each; a build past six hours should say what is blocking it."
+    }
+  },
+  "default_deadline_seconds": 7200,
+  "services": {
+    "coordinator": {
+      "late_after_intervals": 3,
+      "reason": "The Coordinator service writes .local/workflow/coordinator.json every tick. Three missed ticks (3 minutes at the default interval) is late; a process id that is no longer alive is dead. Either way the watchdog runs reconcile itself so the stall guard keeps running."
+    },
+    "relay": {
+      "late_after_intervals": 6,
+      "grace_seconds": 5,
+      "reason": "A relay writes .local/workflow/relays/<session>.json every 2 seconds. Six missed ticks plus five seconds matches the Conversationalist's own view (relay_state). A dead relay is reported with its restart command; a dead relay with unread results waiting is reported as needing attention."
+    },
+    "run": {
+      "stale_after_seconds": 90,
+      "stall_after_seconds": 900,
+      "reason": "The same thresholds as tools/run.py: no heartbeat for 90 seconds while 'running' means the wrapper died (interrupted); heartbeat fresh but no CPU or output for 15 minutes means wedged (stalled). The watchdog reads the records; it does not re-run or stop jobs."
+    }
+  }
+}

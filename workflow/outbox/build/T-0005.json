@@ -1,0 +1,27 @@
+{
+ "schema_version": 1,
+ "id": "T-0005",
+ "kind": "build",
+ "from": "conversationalist",
+ "project": "liveos",
+ "topic": "liveos-conversation",
+ "origin": {
+  "session": "S-dev-conversationalist",
+  "turn": "u-8",
+  "round": 1
+ },
+ "request_key": "S-dev-conversationalist/u-8/watchdog",
+ "question_revision": 1,
+ "input_revision": "git:ba94c299fb706372007ac11324ddd56c73236bbb",
+ "claim_refs": [],
+ "question": "Build the independent watchdog (spec section 4, failure and recovery rules): a process independent of any conversation that detects dead or wedged workers, a dead Coordinator service, dead relays and interrupted run.py jobs, applies capability-specific deadlines and bounded retries, routes to diagnostics through the Coordinator, keeps heartbeats in runtime state and transitions in the ledger.",
+ "scope_ref": "topics/liveos-conversation/index.md",
+ "evidence_needed": null,
+ "done_when": "tools/watchdog.py with --once and service modes; per-kind deadlines in a small config; tests for dead service, dead relay, per-kind deadline, idle tick writing nothing to the ledger; a registration script for a scheduled task that William can approve, not registered; system/methods/watchdog.md.",
+ "after_success": null,
+ "return_to": {
+  "session": "S-dev-conversationalist",
+  "topic": "liveos-conversation"
+ },
+ "submitted": "2026-11-26T05:10:16+00:00"
+}

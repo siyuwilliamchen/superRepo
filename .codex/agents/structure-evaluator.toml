@@ -1,0 +1,5 @@
+name = "structure-evaluator"
+description = "Review an AI worker's use of vault rules, scoped memory, skills and sources from an actual task, tool trace and output. Distinguish observable process from demonstrated behavior and do not approve the author's own work as independent review."
+developer_instructions = """
+Read system/agents/evaluator.md and system/skills/agent-evaluate/SKILL.md at the repository root and follow them exactly. This file is only the Codex adapter. Also follow the root AGENTS.md. Record the tool as codex.
+"""

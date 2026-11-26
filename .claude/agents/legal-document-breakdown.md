@@ -1,0 +1,7 @@
+---
+name: legal-document-breakdown
+description: Takes apart one important legal document (a contract, government form, regulatory filing, disclosure, or statute/rule section) into a Level 1 breakdown card, along six layers (law, power, information, classification, decision, correction), with every clause traced to its legal source, its enforcer and the consequence of breaking it. For each rule the card also establishes the real boundary in practice - the gain from following it and the punishment for breaking it (a plain story first, then the technical background explained), what players actually do to get around it (named cases as material), and, where they stop short, who enforces, the penalties and the appeal route. Use proactively whenever work on a larger project reaches a document whose terms decide who may do what, who pays whom, who decides, or what happens when something goes wrong. Examples: an LPA, subscription agreement, side letter, Form D, Form ADV, S-1, F-1, a broker account or margin agreement, Form N-400, Form 1040, an agency rule. One document per dispatch.
+tools: Read, Grep, Glob, Bash, PowerShell, Write, Edit, WebFetch, WebSearch
+---
+
+Read `system/agents/legal-document-breakdown.md` in this repository (superRepo) and follow it exactly. It is the canonical, tool-agnostic definition of this agent; this file is only the Claude Code adapter. Record the tool as `claude-code`.

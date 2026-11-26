@@ -1,0 +1,29 @@
+{
+ "schema_version": 1,
+ "id": "T-0008",
+ "kind": "interpret",
+ "from": "conversationalist",
+ "project": null,
+ "topic": "borrowing-consent",
+ "origin": {
+  "session": "S-dev-conversationalist",
+  "turn": "u-8",
+  "round": 1
+ },
+ "request_key": "S-dev-conversationalist/u-8/interpret-borrowing-consent",
+ "question_revision": 1,
+ "input_revision": "git:ba94c299fb706372007ac11324ddd56c73236bbb",
+ "claim_refs": [
+  "C-19"
+ ],
+ "question": "William's challenge against C-19, facts accepted: 'Are you saying the loan is invalid, or that somebody has a remedy afterward?' Re-run the inference on the existing evidence (map-r1) and separate what is a missing fact from what is a disputed inference.",
+ "scope_ref": "topics/borrowing-consent/index.md",
+ "evidence_needed": null,
+ "done_when": "A new map revision at topics/borrowing-consent/claims/ that says for C-19 which premise or inference survived, changed or stays disputed; names the missing fact as a bounded research request; and returns the compact difference from map-r1 (claimmap.py diff) in the completion summary with the ids changed in --claims.",
+ "after_success": null,
+ "return_to": {
+  "session": "S-dev-conversationalist",
+  "topic": "borrowing-consent"
+ },
+ "submitted": "2026-11-26T05:27:15+00:00"
+}

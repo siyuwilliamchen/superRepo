@@ -1,0 +1,7 @@
+{
+ "ticket": "T-0002",
+ "sequence": 3,
+ "event": "delivered",
+ "at": "2026-11-26T05:06:21+00:00",
+ "session": "S-dev-conversationalist"
+}
