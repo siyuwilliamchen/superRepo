@@ -28,7 +28,7 @@ implements are in `docs/design/`.
 ## Running it
 
 ```
-python -m unittest discover -s tools/tests -p "test_*.py" -v     # 94 tests
+python -m unittest discover -s tools/tests -p "test_*.py" -v     # 101 tests
 python tools/coordinator.py status                                # the ticket ledger
 python tools/conversationalist.py workspace                       # where things stand, for a session that starts cold
 python tools/conversationalist.py open --session <S> --topic <topic>

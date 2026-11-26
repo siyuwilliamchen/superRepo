@@ -3,8 +3,8 @@
 Phases 2–3 of "LiveOS research through conversation" (William's design, 2026-11-25, Draft 1,
 filed at `Project_Management/inputs/William_2026-11-25_LiveOS_Research_Conversation_Spec.md`).
 Built 2026-11-25/26 on top of the Coordinator (`system/methods/coordinator.md`).
-Code: `tools/conversationalist.py`. Tests: `tools/tests/test_conversationalist.py` (11 tests) and,
-for the workspace added 2026-11-26, `tools/tests/test_workspace.py` (7 tests).
+Code: `tools/conversationalist.py`. Tests: `tools/tests/test_conversationalist.py` (17 tests) and,
+for the workspace added 2026-11-26, `tools/tests/test_workspace.py` (8 tests).
 Role text: `system/agents/conversationalist.md`; adapters `.claude/agents/conversationalist.md`,
 `.codex/agents/conversationalist.toml`. Roster entry with client declarations: `workflow/roster.json`.
 
@@ -46,7 +46,25 @@ checkout has no remote and commits nothing without William's word, so the partne
 | `local` | The request is saved in `sessions/<S>/pending/`; the Coordinator has not accepted it | "saved here; the shared ledger has not taken it yet; I will keep retrying with the same key" |
 | `ledger` | The Coordinator persisted `workflow/outbox/<kind>/<id>.json` and issued a receipt | "recorded as T-0142 … in the local ledger, not yet shared" |
 | `committed` | That file is in a git commit (checked with `git log -- <path>`) | "committed here, not yet on the shared remote" |
-| `remote` | The commit is on a remote-tracking branch (`git branch -r --contains`) | "recorded as T-0142" |
+| `remote` | That exact commit is contained in the intended remote branch as the remote holds it now (`git ls-remote`, then `git merge-base --is-ancestor`) | "recorded as T-0142" |
+
+**`remote` is live evidence or it is pending (2026-11-26).** A remote-tracking ref
+(`refs/remotes/...`) is this checkout's memory of its last fetch or push; it outlives a deleted
+branch, a rewritten one and a lost connection, so it is never read as evidence. The intended
+branch is `LIVEOS_SHARED_BRANCH=<remote>/<branch>` when set, otherwise the upstream of the
+checked-out branch, otherwise the same-named branch on the push remote; another remote branch
+that happens to hold the commit does not count. The remote is asked once per process, with a time
+limit (`LIVEOS_REMOTE_TIMEOUT`, 15 seconds). When the live tip is a commit this checkout has never
+seen, its objects are fetched and no ref is written. Anything short of containment leaves the
+level at `committed` with `shared_remote.state: pending` and one of these reasons:
+
+| `shared_remote.reason` | What the remote said |
+|---|---|
+| `offline` | It could not be reached, or did not answer in time |
+| `absent` | The intended branch is not there (deleted, or never pushed) |
+| `not-contained` | The branch is there at a tip that does not contain the ticket's commit (rewound, rewritten, or not pushed yet) |
+| `unverified` | The branch is at a tip whose history could not be read here |
+| `no-intended-branch` | Detached HEAD, or several remotes and nothing singles one out |
 
 A lost connection (`--offline` in tests) leaves the request at `local`; `flush` retries with the
 original request key, and the Coordinator's idempotency means one ticket however often it is
@@ -135,7 +153,8 @@ When two conversations exist, the one checkpointed last is the workspace; `--ses
 **Verified.** `test_workspace.py` runs every step as a new process against a scratch root, so
 each call is a restart: the reload with no session id; a ticket finished and a result landed
 after the checkpoint; a decision made later; the pointer deleted, corrupted, pointed at a missing
-session and left stale; two sessions; the empty case. **Live run, 2026-11-26:** a new Claude Code
+session and left stale; two sessions; the empty case; a committed ticket with a shared remote that
+cannot be reached. **Live run, 2026-11-26:** a new Claude Code
 session (`claude -p --model haiku --safe-mode`, built-in tools limited to Bash, one allowed
 command, prompts denied) was told only to run `python tools/conversationalist.py workspace`
 against a scratch root holding one invented conversation, and to say where things stood. It ran
@@ -145,7 +164,10 @@ open research ticket and the deferred point, and the recorded next action, each 
 **Limits.** A decision exists only if the partner records it with `decide`; nothing extracts
 decisions from the turns. The next action is whatever one sentence was given at the checkpoint.
 The live reload was run on Claude Code with a small model and invented content; a Codex session
-playing the Conversationalist has not been tried.
+playing the Conversationalist has not been tried. Loading the workspace reads each open ticket's
+acknowledgment level, so in a checkout with a remote and a committed ticket it asks the remote
+once (the live check described above, bounded by `LIVEOS_REMOTE_TIMEOUT`); offline, the level
+reads `committed` and the load still completes.
 
 ## Where this departs from the design
 

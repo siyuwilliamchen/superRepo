@@ -22,8 +22,8 @@ adapter's instructions.
 
 ## Verification checklist (Codex)
 
-1. `python -m unittest discover -s tools/tests -p "test_*.py" -v` from the repository root: 94 tests
-   on 2026-11-26 (64 before the model check, usage accounting and workspace were added). The ledger
+1. `python -m unittest discover -s tools/tests -p "test_*.py" -v` from the repository root: 101 tests
+   on 2026-11-26 (70 before the model check, usage accounting and workspace were added). The ledger
    baseline test skips when the vault's IPO-timing chain is not present; the real-map tests skip
    with no vault; the two live model-check tests skip unless `LIVEOS_LIVE_MODELCHECK=1`, because
    each starts one tiny worker and spends a few provider tokens.

@@ -41,7 +41,7 @@ class Workspace(unittest.TestCase):
 
     def run_tool(self, tool, *args, ok=True):
         r = subprocess.run([sys.executable, "-I", str(TOOLS / tool), *args],
-                           env=dict(os.environ, LIVEOS_ROOT=str(self.root)),
+                           env=dict(os.environ, LIVEOS_ROOT=str(self.root), LIVEOS_REMOTE_TIMEOUT="5"),
                            capture_output=True, text=True, encoding="utf-8", timeout=120)
         if ok:
             self.assertEqual(r.returncode, 0, f"{tool} {args}\n{r.stdout}\n{r.stderr}")
@@ -257,6 +257,27 @@ class Workspace(unittest.TestCase):
         text = self.run_tool("conversationalist.py", "workspace")[1]
         self.assertIn("decisions       none recorded", text)
         self.assertIn("pending work    none", text)
+
+    # ---- the acknowledgment level is read live; an unreachable remote must not block the load
+    def test_workspace_loads_when_the_shared_remote_cannot_be_reached(self):
+        if not shutil.which("git"):
+            self.skipTest("git is not installed")
+        r = self.round_one()
+
+        def git(*args):
+            return subprocess.run(["git", "-C", str(self.root), *args], capture_output=True, text=True,
+                                  encoding="utf-8")
+        git("init", "-q")
+        git("config", "user.email", "test@example.invalid")
+        git("config", "user.name", "test")
+        git("add", "workflow")
+        self.assertEqual(git("commit", "-q", "-m", "ledger").returncode, 0)
+        git("remote", "add", "origin", str(self.root / "no-such-remote.git"))
+        ws = self.fresh()
+        self.assertEqual(ws["workspace"], "loaded")
+        self.assertEqual([(t["receipt"], t["ack"]) for t in ws["pending_work"]["open_tickets"]],
+                         [(r["ticket"], "committed")], "committed here; the remote gave no live evidence")
+        self.assertEqual(ws["next_action"]["text"], NEXT)
 
     # ---- private state stays out of git
     def test_workspace_and_sessions_are_ignored_by_git(self):
